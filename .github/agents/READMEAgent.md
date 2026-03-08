@@ -4,8 +4,11 @@
 # To make this agent available, merge this file into the default repository branch.
 # For format details, see: https://gh.io/customagents/config
 
-# name: README
-# description: Agent to Create README
+name:
+description: README Updating Agent
+---
 
 # My Agent
-On the main page, I want you to create me a README for the repo that is directory style. I want the user to have the ability to navigate easily from this page.
+
+I want you to continuously update my README.md as I continue to expand my notes. I love the current format and would like you to continue to update as my notes continue.
+

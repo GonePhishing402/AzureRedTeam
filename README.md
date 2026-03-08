@@ -30,6 +30,7 @@ Scripts for obtaining Key Vault access tokens and auditing Key Vault RBAC permis
 
 - **[Get-AzureKeyVaultAccessTokenFromRefreshToken.ps1](./KeyVault/Get-AzureKeyVaultAccessTokenFromRefreshToken.ps1)** — Exchanges an Azure AD OAuth refresh token for a new access token scoped to Azure Key Vault (`https://vault.azure.net/.default`) via the Microsoft identity platform token endpoint.
 - **[Get-KeyVaultRBACPermissions.ps1](./KeyVault/Get-KeyVaultRBACPermissions.ps1)** — Queries the Azure Resource Manager (ARM) REST API to retrieve RBAC permission assignments configured on an Azure Key Vault. Uses the current Azure context to identify the vault and authenticates with a management bearer token.
+- **[azure_keyvault_access_explanation.md](./KeyVault/azure_keyvault_access_explanation.md)** — Deep-dive reference explaining why Azure Key Vault separates management-plane (ARM) access from data-plane access. Covers the two API endpoints, required credentials for data-plane access, Key Vault RBAC data roles, and a red-team perspective on requesting resource-specific tokens from a captured refresh token.
 
 ---
 
@@ -39,3 +40,4 @@ Scripts for acquiring Azure Storage tokens and auditing Storage Account RBAC per
 
 - **[Get-AzureBlobStorageTokenAndListContainers.ps1](./Storage/Get-AzureBlobStorageTokenAndListContainers.ps1)** — Generates a signed JWT client assertion, exchanges it for an Azure Storage access token via the OAuth 2.0 client credentials flow, and lists blob containers on a target storage account through the Blob Storage REST API.
 - **[Get-StorageAccountRBACPermissions.ps1](./Storage/Get-StorageAccountRBACPermissions.ps1)** — Queries the Azure Resource Manager (ARM) REST API to retrieve RBAC permission assignments on an Azure Storage Account. Authenticates with a management bearer token and returns the permission details.
+- **[azure_storage_token_explanation.md](./Storage/azure_storage_token_explanation.md)** — Deep-dive reference explaining why Azure Storage separates management-plane (ARM) access from data-plane access. Covers storage credentials (access keys, SAS tokens, OAuth), Storage Blob data roles, and a red-team perspective on requesting resource-specific tokens from a captured refresh token.

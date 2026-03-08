@@ -21,13 +21,16 @@ Connect-AzAccount -AccessToken $ARM -KeyVaultAccessToken $KeyVaultToken -Account
 ```
 #View Certificate in Vault
 Get-AzKeyVaultCertificate -VaultName GISAppvault
-
+```
+```
 #Retreive secret from vault
 $secret = Get-AzKeyVaultSecret -VaultName GISAppvault -Name GISAppCert -AsPlainText
-
+```
+```
 #Convert Secret from Base64
 $secretByte = [Convert]::FromBase64String($secret)
-
+```
+```
 #Save Converted secret to pfx file
 [System.IO.File]::WriteAllBytes("C:\Users\studentuser96\GISAppcert.pfx", $secretByte)
 

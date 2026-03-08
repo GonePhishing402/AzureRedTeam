@@ -33,10 +33,10 @@
 ###############################################################
 
 # Azure AD tenant ID
-$TenantID = "d6bd5a42-7c65-421c-ad23-a25a5d5fa57f"
+$TenantID = ""
 
 # Azure AD application (client) ID
-$ClientID = $DataAnalyticsAppID
+$ClientID = ""
 
 # Azure Storage resource scope
 $StorageScope = "https://storage.azure.com/.default"
@@ -45,7 +45,7 @@ $StorageScope = "https://storage.azure.com/.default"
 $TokenEndpoint = "https://login.microsoftonline.com/$TenantID/oauth2/v2.0/token"
 
 # Target Azure Storage account name
-$StorageAccountName = "oildatastore"
+$StorageAccountName = ""
 
 # Blob Storage service endpoint used to list contents
 $StorageListUrl = "https://$StorageAccountName.blob.core.windows.net/?comp=list"

@@ -41,3 +41,9 @@ Scripts for acquiring Azure Storage tokens and auditing Storage Account RBAC per
 - **[Get-AzureBlobStorageTokenAndListContainers.ps1](./Storage/Get-AzureBlobStorageTokenAndListContainers.ps1)** — Generates a signed JWT client assertion, exchanges it for an Azure Storage access token via the OAuth 2.0 client credentials flow, and lists blob containers on a target storage account through the Blob Storage REST API.
 - **[Get-StorageAccountRBACPermissions.ps1](./Storage/Get-StorageAccountRBACPermissions.ps1)** — Queries the Azure Resource Manager (ARM) REST API to retrieve RBAC permission assignments on an Azure Storage Account. Authenticates with a management bearer token and returns the permission details.
 - **[azure_storage_token_explanation.md](./Storage/azure_storage_token_explanation.md)** — Deep-dive reference explaining why Azure Storage separates management-plane (ARM) access from data-plane access. Covers storage credentials (access keys, SAS tokens, OAuth), Storage Blob data roles, and a red-team perspective on requesting resource-specific tokens from a captured refresh token.
+
+---
+
+### [Tokens](./Tokens/)
+
+Scripts and references for acquiring, manipulating, and abusing Azure access tokens — a core focus area for red team operations targeting Azure and Microsoft 365 environments.

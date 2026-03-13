@@ -35,3 +35,11 @@ $secretByte = [Convert]::FromBase64String($secret)
 [System.IO.File]::WriteAllBytes("C:\Users\studentuser96\GISAppcert.pfx", $secretByte)
 
 ```
+## Connect to MgGraph with Certificate
+```powershell
+$PfxPath = "/Path/to/Certificate"
+$AppCertificate = Get-PfxCertificate -FilePath $PfxPath
+```
+```powershell
+Connect-MgGraph -Certificate $GAppCertificate -ClientId $ClientId -TenantId $TenantId
+```

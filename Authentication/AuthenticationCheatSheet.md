@@ -41,5 +41,5 @@ $PfxPath = "/Path/to/Certificate"
 $AppCertificate = Get-PfxCertificate -FilePath $PfxPath
 ```
 ```powershell
-Connect-MgGraph -Certificate $GAppCertificate -ClientId $ClientId -TenantId $TenantId
+Connect-MgGraph -Certificate $AppCertificate -ClientId $ClientId -TenantId $TenantId
 ```

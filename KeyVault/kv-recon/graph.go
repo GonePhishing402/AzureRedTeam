@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 const graphBase = "https://graph.microsoft.com/v1.0"
@@ -144,62 +145,8 @@ func ListApplications(accessToken string) ([]GraphApplication, error) {
 	return all, nil
 }
 
-// ── App Role Assignments ──────────────────────────────────────────────────────
+// ── Conditional Access Policies ───────────────────────────────────────────────
 
-type GraphAppRoleAssignment struct {
-	ID                   string `json:"id"`
-	PrincipalDisplayName string `json:"principalDisplayName"`
-	PrincipalType        string `json:"principalType"`
-	ResourceDisplayName  string `json:"resourceDisplayName"`
-	AppRoleID            string `json:"appRoleId"`
-	CreatedDateTime      string `json:"createdDateTime"`
-}
-
-type appRolePage struct {
-	Value    []GraphAppRoleAssignment `json:"value"`
-	NextLink string                   `json:"@odata.nextLink"`
-}
-
-// ListAppRoleAssignments returns all app role assignments across all service principals.
-// This shows which principals (users/groups/SPs) have been granted app roles.
-func ListAppRoleAssignments(accessToken string) ([]GraphAppRoleAssignment, error) {
-	// First get all service principals (paginated).
-	type sp struct {
-		ID string `json:"id"`
-	}
-	type spPage struct {
-		Value    []sp   `json:"value"`
-		NextLink string `json:"@odata.nextLink"`
-	}
-
-	spURL := graphBase + "/servicePrincipals?$select=id&$top=999"
-	var sps []sp
-	for spURL != "" {
-		var page spPage
-		next, err := graphGet(accessToken, spURL, &page)
-		if err != nil {
-			return nil, fmt.Errorf("listing service principals: %w", err)
-		}
-		sps = append(sps, page.Value...)
-		spURL = next
-	}
-
-	// Collect all appRoleAssignments for each SP.
-	var all []GraphAppRoleAssignment
-	for _, s := range sps {
-		url := fmt.Sprintf("%s/servicePrincipals/%s/appRoleAssignedTo?$top=999", graphBase, s.ID)
-		for url != "" {
-			var page appRolePage
-			next, err := graphGet(accessToken, url, &page)
-			if err != nil {
-				break // skip SPs we can't read, continue with next
-			}
-			all = append(all, page.Value...)
-			url = next
-		}
-	}
-	return all, nil
-}
 
 // ── Conditional Access Policies ───────────────────────────────────────────────
 
@@ -276,8 +223,32 @@ type driveItemPage struct {
 }
 
 func ListOwnDrive(accessToken string) ([]DriveItem, error) {
-	url := graphBase + "/me/drive/root/children?$select=id,name,size,lastModifiedDateTime,folder,webUrl,@microsoft.graph.downloadUrl&$top=200"
+	// Try /me/drive first; fall back to first available drive on 404.
+	root := graphBase + "/me/drive/root/children?$select=id,name,size,lastModifiedDateTime,folder,webUrl&$top=200"
+	all, err := fetchDriveItems(accessToken, root)
+	if err != nil && strings.Contains(err.Error(), "404") {
+		// User may have OneDrive under /me/drives instead.
+		type driveRef struct {
+			ID string `json:"id"`
+		}
+		type drivesPage struct {
+			Value []driveRef `json:"value"`
+		}
+		var dp drivesPage
+		_, rerr := graphGet(accessToken, graphBase+"/me/drives", &dp)
+		if rerr != nil || len(dp.Value) == 0 {
+			return nil, err // return original error
+		}
+		fallback := fmt.Sprintf("%s/drives/%s/root/children?$select=id,name,size,lastModifiedDateTime,folder,webUrl&$top=200",
+			graphBase, dp.Value[0].ID)
+		return fetchDriveItems(accessToken, fallback)
+	}
+	return all, err
+}
+
+func fetchDriveItems(accessToken, startURL string) ([]DriveItem, error) {
 	var all []DriveItem
+	url := startURL
 	for url != "" {
 		var page driveItemPage
 		next, err := graphGet(accessToken, url, &page)

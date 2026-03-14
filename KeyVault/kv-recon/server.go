@@ -57,9 +57,12 @@ func StartServer(addr, port string, openBrowser bool) {
 	mux.HandleFunc("/api/graph/users", handleGraphUsers)
 	mux.HandleFunc("/api/graph/devices", handleGraphDevices)
 	mux.HandleFunc("/api/graph/applications", handleGraphApplications)
-	mux.HandleFunc("/api/graph/approles", handleGraphAppRoles)
 	mux.HandleFunc("/api/graph/caps", handleGraphCAPs)
 	mux.HandleFunc("/api/graph/onedrive", handleGraphOneDrive)
+	mux.HandleFunc("/api/graph/onedrive/download", handleOneDriveDownload)
+
+	// FOCI token exchange
+	mux.HandleFunc("/api/foci/exchange", handleFOCIExchange)
 
 	fmt.Printf("[*] kv-recon web UI → %s\n", baseURL)
 	fmt.Println("[*] Press Ctrl+C to stop.")
@@ -419,24 +422,6 @@ func handleGraphApplications(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, results)
 }
 
-func handleGraphAppRoles(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	t, err := resolveToken(r)
-	if err != nil {
-		jsonError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	results, err := ListAppRoleAssignments(t.AccessToken)
-	if err != nil {
-		jsonError(w, "graph error: "+err.Error(), http.StatusBadGateway)
-		return
-	}
-	respondJSON(w, results)
-}
-
 func handleGraphCAPs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -699,4 +684,127 @@ func handleDeviceCodeStream(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// handleOneDriveDownload proxies a file download through the Graph API.
+// GET /api/graph/onedrive/download?tokenId=xxx&itemId=yyy
+func handleOneDriveDownload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	tokenID := r.URL.Query().Get("tokenId")
+	itemID := r.URL.Query().Get("itemId")
+	if tokenID == "" || itemID == "" {
+		jsonError(w, "tokenId and itemId are required", http.StatusBadRequest)
+		return
+	}
+	t, err := GetToken(tokenID)
+	if err != nil {
+		jsonError(w, "token not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Fetch the item metadata to get @microsoft.graph.downloadUrl.
+	graphURL := fmt.Sprintf("https://graph.microsoft.com/v1.0/me/drive/items/%s", itemID)
+	req, _ := http.NewRequest(http.MethodGet, graphURL, nil)
+	req.Header.Set("Authorization", "Bearer "+t.AccessToken)
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		jsonError(w, "graph request failed: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 400 {
+		jsonError(w, fmt.Sprintf("graph error %d: %s", resp.StatusCode, string(body)), resp.StatusCode)
+		return
+	}
+
+	var item struct {
+		Name        string `json:"name"`
+		DownloadURL string `json:"@microsoft.graph.downloadUrl"`
+	}
+	json.Unmarshal(body, &item) //nolint:errcheck
+
+	if item.DownloadURL == "" {
+		jsonError(w, "no download URL (item may be a folder)", http.StatusNotFound)
+		return
+	}
+	http.Redirect(w, r, item.DownloadURL, http.StatusFound)
+}
+
+// handleFOCIExchange exchanges a stored refresh token using a different client ID (FOCI).
+// POST /api/foci/exchange  body: {tokenId, clientId, scope, label}
+func handleFOCIExchange(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		TokenID  string `json:"tokenId"`
+		ClientID string `json:"clientId"`
+		Scope    string `json:"scope"`
+		Label    string `json:"label"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	if req.TokenID == "" || req.ClientID == "" || req.Scope == "" {
+		jsonError(w, "tokenId, clientId, and scope are required", http.StatusBadRequest)
+		return
+	}
+
+	src, err := GetToken(req.TokenID)
+	if err != nil {
+		jsonError(w, "source token not found: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if src.RefreshToken == "" {
+		jsonError(w, "selected token has no refresh token", http.StatusBadRequest)
+		return
+	}
+
+	at, rt, exp, err := exchangeToken(src.TenantID, req.ClientID, src.RefreshToken, req.Scope)
+	if err != nil {
+		jsonError(w, "token exchange failed: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	label := req.Label
+	if label == "" {
+		suffix := req.ClientID
+		if len(suffix) > 8 {
+			suffix = suffix[:8]
+		}
+		label = "FOCI:" + suffix
+	}
+
+	entry := TokenEntry{
+		Label:        label,
+		TenantID:     src.TenantID,
+		ClientID:     req.ClientID,
+		AccessToken:  at,
+		RefreshToken: rt,
+		ExpiresAt:    time.Now().Add(time.Duration(exp) * time.Second),
+		Scopes:       req.Scope,
+	}
+	if err := SaveToken(entry); err != nil {
+		jsonError(w, "failed to save token: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, map[string]interface{}{
+		"accessToken": at,
+		"expiresIn":   exp,
+	})
 }

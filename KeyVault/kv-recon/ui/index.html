@@ -150,7 +150,7 @@
     }
     input::placeholder { color: #484f58; }
     input:focus, select:focus { outline: none; border-color: var(--accent); }
-    select option { background: var(--overlay); color: var(--text); }
+    select option { background: #ffffff; color: #1a1a1a; }
 
     /* ── Buttons ──────────────────────────────────────────── */
     .actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
@@ -331,6 +331,9 @@
     <div class="nav-item active" data-section="tokens">
       <span class="nav-icon">&#128273;</span><span>Tokens</span>
     </div>
+    <div class="nav-item" data-section="foci">
+      <span class="nav-icon">&#128257;</span><span>FOCI Exchange</span>
+    </div>
 
     <div class="nav-section">Key Vault</div>
     <div class="nav-item" data-section="kvrecon">
@@ -346,9 +349,6 @@
     </div>
     <div class="nav-item" data-section="applications">
       <span class="nav-icon">&#128196;</span><span>Applications</span>
-    </div>
-    <div class="nav-item" data-section="approles">
-      <span class="nav-icon">&#128275;</span><span>App Roles</span>
     </div>
     <div class="nav-item" data-section="caps">
       <span class="nav-icon">&#128737;</span><span>Cond. Access</span>
@@ -708,9 +708,85 @@
       </div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Last Modified</th><th>Link</th></tr></thead>
+          <thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Last Modified</th><th>View</th><th>Download</th></tr></thead>
           <tbody id="onedriveBody"></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ FOCI ═══════════════════════════════════════════ -->
+    <div class="section" id="sec-foci">
+      <div class="page-title">&#128257; FOCI Token Exchange</div>
+      <div class="card">
+        <div class="card-header"><h2>Exchange Refresh Token</h2></div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Use a stored refresh token with a different client ID to obtain a new access token scoped to a different resource (Family of Client IDs).</p>
+          <form id="fociForm" autocomplete="off">
+            <div class="form-grid">
+              <div class="field">
+                <label>Source Refresh Token <em>*</em></label>
+                <select id="fociTokenSel" class="token-sel"></select>
+              </div>
+              <div class="field">
+                <label>Target Client ID <em>*</em></label>
+                <select id="fociClientId">
+                  <option value="04b07795-8ddb-461a-bbee-02f9e1bf7b46">Azure CLI (04b07795)</option>
+                  <option value="1950a258-227b-4e31-a9cf-717495945fc2">Azure PowerShell (1950a258)</option>
+                  <option value="d3590ed6-52b3-4102-aeff-aad2292ab01c">Microsoft Office (d3590ed6)</option>
+                  <option value="ab9b8c07-8f02-4f72-87fa-80105867a763">OneDrive Sync (ab9b8c07)</option>
+                  <option value="57fcbcfa-7cee-4eb1-8b25-12d2030b4ee0">Teams (57fcbcfa)</option>
+                  <option value="custom">Custom…</option>
+                </select>
+              </div>
+              <div class="field" id="fociCustomClientIdField" style="display:none">
+                <label>Custom Client ID <em>*</em></label>
+                <input type="text" id="fociCustomClientId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" spellcheck="false">
+              </div>
+              <div class="field full">
+                <label>Scope <em>*</em></label>
+                <select id="fociScopePreset" onchange="fociScopePresetChange()">
+                  <option value="https://management.azure.com/.default offline_access">Azure Management</option>
+                  <option value="https://graph.microsoft.com/.default offline_access">Microsoft Graph</option>
+                  <option value="https://vault.azure.net/.default offline_access">Key Vault</option>
+                  <option value="https://storage.azure.com/.default offline_access">Azure Storage</option>
+                  <option value="custom">Custom…</option>
+                </select>
+              </div>
+              <div class="field full" id="fociCustomScopeField" style="display:none">
+                <label>Custom Scope</label>
+                <input type="text" id="fociCustomScope" placeholder="https://resource.azure.com/.default" spellcheck="false">
+              </div>
+              <div class="field full">
+                <label>Label (optional)</label>
+                <input type="text" id="fociLabel" placeholder="e.g. arm-token-from-graph" spellcheck="false">
+              </div>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn-primary" id="fociExchangeBtn">&#128257; Exchange Token</button>
+              <span class="status" id="fociStatus"><span class="spinner"></span><span id="fociStatusText"></span></span>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Result card (hidden until exchange succeeds) -->
+      <div class="card" id="fociResultCard" style="display:none;margin-top:16px">
+        <div class="card-header"><h2>&#10003; New Token</h2></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="field" style="grid-column:1/-1">
+              <label>Access Token (preview)</label>
+              <div class="jwt-box" id="fociAccessTokenBox" style="max-height:120px"></div>
+            </div>
+            <div class="field">
+              <label>Expires In</label>
+              <div id="fociExpiresIn" style="font-size:13px;padding:4px 0"></div>
+            </div>
+          </div>
+          <div class="actions" style="margin-top:8px">
+            <button class="btn-ghost" onclick="fociCopyToken()">&#128203; Copy Access Token</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1399,19 +1475,88 @@ document.getElementById('onedriveRunBtn').addEventListener('click', function() {
       var html = '';
       rows.forEach(function(f) {
         var type = f.folder ? '<span class="badge badge-blue">Folder</span>' : '<span class="badge badge-gray">File</span>';
-        var link = f.webUrl
-          ? '<a class="tbl-link" href="' + esc(f.webUrl) + '" target="_blank" rel="noopener noreferrer">Open</a>'
+        var tokenId = document.getElementById('onedriveTokenSel').value;
+        var view = f.webUrl
+          ? '<a class="tbl-link" href="' + esc(f.webUrl) + '" target="_blank" rel="noopener noreferrer">View</a>'
+          : '—';
+        var dl = (!f.folder && f.id)
+          ? '<a class="tbl-link" href="/api/graph/onedrive/download?tokenId=' + encodeURIComponent(tokenId) + '&itemId=' + encodeURIComponent(f.id) + '">Download</a>'
           : '—';
         html += '<tr>' +
           '<td>' + fmt(f.name) + '</td>' +
           '<td>' + type + '</td>' +
           '<td>' + fmtSize(f.size) + '</td>' +
           '<td>' + fmtDate(f.lastModifiedDateTime) + '</td>' +
-          '<td>' + link + '</td></tr>';
+          '<td>' + view + '</td>' +
+          '<td>' + dl + '</td></tr>';
       });
-      document.getElementById('onedriveBody').innerHTML = html || emptyRow(5, 'No files returned.');
+      document.getElementById('onedriveBody').innerHTML = html || emptyRow(6, 'No files returned.');
     }
   });
+});
+
+/* ════════════════════════════════════════════════════════════════════
+   FOCI EXCHANGE
+   ════════════════════════════════════════════════════════════════════ */
+var _fociAccessToken = '';
+
+document.getElementById('fociClientId').addEventListener('change', function() {
+  document.getElementById('fociCustomClientIdField').style.display =
+    this.value === 'custom' ? '' : 'none';
+});
+
+window.fociScopePresetChange = function() {
+  var val = document.getElementById('fociScopePreset').value;
+  document.getElementById('fociCustomScopeField').style.display = val === 'custom' ? '' : 'none';
+};
+
+window.fociCopyToken = function() {
+  if (_fociAccessToken) navigator.clipboard.writeText(_fociAccessToken);
+};
+
+document.getElementById('fociForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var tokenId = document.getElementById('fociTokenSel').value;
+  if (!tokenId) { alert('Please select a source token.'); return; }
+
+  var clientId = document.getElementById('fociClientId').value === 'custom'
+    ? document.getElementById('fociCustomClientId').value.trim()
+    : document.getElementById('fociClientId').value;
+  if (!clientId) { alert('Please provide a client ID.'); return; }
+
+  var scope = document.getElementById('fociScopePreset').value === 'custom'
+    ? document.getElementById('fociCustomScope').value.trim()
+    : document.getElementById('fociScopePreset').value;
+  if (!scope) { alert('Please provide a scope.'); return; }
+
+  var label = document.getElementById('fociLabel').value.trim();
+
+  var btn = document.getElementById('fociExchangeBtn');
+  btn.disabled = true;
+  showStatus('foci', 'running', 'Exchanging token\u2026');
+  document.getElementById('fociResultCard').style.display = 'none';
+
+  try {
+    var r = await fetch('/api/foci/exchange', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tokenId: tokenId, clientId: clientId, scope: scope, label: label}),
+    });
+    var data = await r.json();
+    if (!r.ok) { throw new Error(data.error || r.statusText); }
+
+    _fociAccessToken = data.accessToken || '';
+    var mins = Math.round((data.expiresIn || 3600) / 60);
+    document.getElementById('fociAccessTokenBox').textContent = _fociAccessToken.substring(0, 200) + (
+      _fociAccessToken.length > 200 ? '\u2026' : '');
+    document.getElementById('fociExpiresIn').textContent = mins + ' minutes';
+    document.getElementById('fociResultCard').style.display = '';
+    showStatus('foci', 'done', '\u2713 Token saved \u2014 label: ' + (label || 'auto'));
+    loadTokens(); // refresh stored-token lists
+  } catch(err) {
+    showStatus('foci', 'error', '\u2717 ' + err.message);
+  }
+  btn.disabled = false;
 });
 
 /* ════════════════════════════════════════════════════════════════════

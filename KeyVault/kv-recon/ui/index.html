@@ -265,6 +265,36 @@
     a.tbl-link { color: var(--accent); text-decoration: none; }
     a.tbl-link:hover { text-decoration: underline; }
 
+    /* ── Tabs ──────────────────────────────────────────────── */
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+    .tab-btn {
+      background: none; border: none; border-bottom: 2px solid transparent;
+      color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 500;
+      padding: 8px 16px; margin-bottom: -1px; transition: color 0.12s, border-color 0.12s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+    .jwt-box {
+      background: #010409;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: "SFMono-Regular", ui-monospace, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      max-height: 420px;
+      overflow: auto;
+      padding: 12px 14px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .jwt-section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 10px 0 4px; }
+    .jwt-section-label:first-child { margin-top: 0; }
+    .jwt-header-color  { color: #f78166; }
+    .jwt-payload-color { color: var(--cyan); }
+    .jwt-sig-color     { color: #484f58; }
+
     /* ── Token section extras ─────────────────────────────── */
     .token-id { font-family: monospace; font-size: 11px; color: var(--muted); }
     .expiry-ok   { color: var(--green); }
@@ -419,6 +449,38 @@
         </div>
       </div>
 
+      <!-- JWT Inspector -->
+      <div class="card">
+        <div class="card-header"><h2>&#128269; JWT Inspector</h2></div>
+        <div class="card-body">
+          <div class="field" style="margin-bottom:12px">
+            <label>Select Token</label>
+            <select id="jwtTokenSel" class="token-sel" onchange="renderJWT()"></select>
+          </div>
+          <div class="tabs" id="jwtTabs">
+            <button class="tab-btn active" data-tab="jwtRaw">Raw</button>
+            <button class="tab-btn" data-tab="jwtDecoded">Decoded</button>
+          </div>
+          <!-- Raw tab -->
+          <div class="tab-pane active" id="jwtRaw">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+              <span style="font-size:12px;color:var(--muted)">Access Token</span>
+              <button class="btn-ghost btn-sm" onclick="copyJWT('access')">&#128203; Copy</button>
+            </div>
+            <div class="jwt-box" id="jwtRawAccess" style="color:#8b949e">Select a token above.</div>
+            <div style="display:flex;gap:8px;align-items:center;margin:10px 0 6px">
+              <span style="font-size:12px;color:var(--muted)">Refresh Token</span>
+              <button class="btn-ghost btn-sm" onclick="copyJWT('refresh')">&#128203; Copy</button>
+            </div>
+            <div class="jwt-box" id="jwtRawRefresh" style="color:#8b949e">Select a token above.</div>
+          </div>
+          <!-- Decoded tab -->
+          <div class="tab-pane" id="jwtDecoded">
+            <div class="jwt-box" id="jwtDecodedBox" style="color:#8b949e">Select a token above.</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Token table -->
       <div class="card">
         <div class="card-header">
@@ -453,6 +515,12 @@
         <div class="card-body">
           <form id="kvForm" autocomplete="off">
             <div class="form-grid">
+              <div class="field full">
+                <label>Load from stored token <span style="font-weight:400;color:#484f58">(auto-fills credentials below)</span></label>
+                <select id="kvTokenSel" class="token-sel" onchange="kvLoadStoredToken()">
+                  <option value="">— manual entry —</option>
+                </select>
+              </div>
               <div class="field full">
                 <label>Refresh Token <em>*</em></label>
                 <input type="password" id="kvRefreshToken" data-mono placeholder="0.AROA..." spellcheck="false">
@@ -854,21 +922,21 @@ function renderTokenTable() {
   storedTokens.forEach(function(t) {
     var exp = '';
     var now = Date.now();
-    if (t.ExpiresAt) {
-      var ms = new Date(t.ExpiresAt).getTime() - now;
+    if (t.expiresAt) {
+      var ms = new Date(t.expiresAt).getTime() - now;
       var cls = ms < 0 ? 'expiry-dead' : ms < 300000 ? 'expiry-warn' : 'expiry-ok';
-      var label = ms < 0 ? 'Expired' : 'Expires ' + new Date(t.ExpiresAt).toLocaleTimeString();
+      var label = ms < 0 ? 'Expired' : 'Expires ' + new Date(t.expiresAt).toLocaleTimeString();
       exp = '<span class="' + cls + '">' + esc(label) + '</span>';
     }
     html += '<tr>' +
-      '<td><strong>' + esc(t.Label || 'unknown') + '</strong></td>' +
-      '<td><span class="token-id">' + esc((t.ID||'').substring(0,8)) + '…</span></td>' +
-      '<td>' + fmt(t.TenantID) + '</td>' +
-      '<td>' + fmt(t.Scopes) + '</td>' +
+      '<td><strong>' + esc(t.label || 'unknown') + '</strong></td>' +
+      '<td><span class="token-id">' + esc((t.id||'').substring(0,8)) + '…</span></td>' +
+      '<td>' + fmt(t.tenantId) + '</td>' +
+      '<td>' + fmt(t.scopes) + '</td>' +
       '<td>' + (exp || '—') + '</td>' +
       '<td style="white-space:nowrap">' +
-        '<button class="btn-ghost btn-sm" onclick="doRefreshToken(' + JSON.stringify(t.ID) + ')">&#8635;</button> ' +
-        '<button class="btn-danger btn-sm" onclick="doDeleteToken(' + JSON.stringify(t.ID) + ')">&#128465;</button>' +
+        '<button class="btn-ghost btn-sm" onclick="doRefreshToken(' + JSON.stringify(t.id) + ')">&#8635;</button> ' +
+        '<button class="btn-danger btn-sm" onclick="doDeleteToken(' + JSON.stringify(t.id) + ')">&#128465;</button>' +
       '</td></tr>';
   });
   tbody.innerHTML = html;
@@ -881,12 +949,27 @@ function refreshTokenSelectors() {
     sel.innerHTML = '<option value="">— select a token —</option>';
     storedTokens.forEach(function(t) {
       var opt = document.createElement('option');
-      opt.value = t.ID;
-      opt.textContent = (t.Label || 'unknown') + ' [' + (t.ID||'').substring(0,8) + ']';
+      opt.value = t.id;
+      opt.textContent = (t.label || 'unknown') + ' [' + (t.id||'').substring(0,8) + ']';
       sel.appendChild(opt);
     });
     sel.value = prev;
   });
+  // KV selector has its own blank label.
+  var kvSel = document.getElementById('kvTokenSel');
+  if (kvSel) {
+    var prevKV = kvSel.value;
+    kvSel.innerHTML = '<option value="">\u2014 manual entry \u2014</option>';
+    storedTokens.forEach(function(t) {
+      var opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = (t.label || 'unknown') + ' [' + (t.id||'').substring(0,8) + ']';
+      kvSel.appendChild(opt);
+    });
+    kvSel.value = prevKV;
+  }
+  // Re-render JWT inspector if a token is selected.
+  if (typeof renderJWT === 'function') renderJWT();
 }
 
 window.doDeleteToken = async function(id) {
@@ -938,7 +1021,7 @@ document.getElementById('addTokenForm').addEventListener('submit', async functio
     });
     if (!r.ok) throw new Error(await r.text());
     var t = await r.json();
-    showStatus('addToken', 'done', '\u2713 Saved as "' + (t.Label||'unknown') + '"');
+    showStatus('addToken', 'done', '\u2713 Saved as "' + (t.label||'unknown') + '"');
     document.getElementById('addTokenForm').reset();
     await loadTokens();
     refreshTokenSelectors();
@@ -947,6 +1030,88 @@ document.getElementById('addTokenForm').addEventListener('submit', async functio
   }
   btn.disabled = false;
 });
+
+/* ════════════════════════════════════════════════════════════════════
+   JWT INSPECTOR
+   ════════════════════════════════════════════════════════════════════ */
+(function initJWTInspector() {
+  // Tab switching.
+  document.getElementById('jwtTabs').addEventListener('click', function(e) {
+    var btn = e.target.closest('.tab-btn');
+    if (!btn) return;
+    document.querySelectorAll('#jwtTabs .tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    var target = btn.dataset.tab;
+    document.getElementById('jwtRaw').classList.toggle('active', target === 'jwtRaw');
+    document.getElementById('jwtDecoded').classList.toggle('active', target === 'jwtDecoded');
+  });
+})();
+
+function decodeJWTPart(b64url) {
+  try {
+    var s = b64url.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    return JSON.parse(atob(s));
+  } catch(_) { return null; }
+}
+
+window.renderJWT = function() {
+  var id = document.getElementById('jwtTokenSel').value;
+  var t = id ? storedTokens.find(function(x) { return x.id === id; }) : null;
+
+  var rawAccess  = document.getElementById('jwtRawAccess');
+  var rawRefresh = document.getElementById('jwtRawRefresh');
+  var decoded    = document.getElementById('jwtDecodedBox');
+
+  if (!t) {
+    rawAccess.textContent  = 'Select a token above.';
+    rawRefresh.textContent = 'Select a token above.';
+    decoded.innerHTML      = 'Select a token above.';
+    return;
+  }
+
+  rawAccess.textContent  = t.accessToken  || '(none)';
+  rawRefresh.textContent = t.refreshToken || '(none)';
+
+  // Decode the access token JWT.
+  var parts = (t.accessToken || '').split('.');
+  if (parts.length < 2) {
+    decoded.innerHTML = '<span style="color:var(--muted)">Access token is not a JWT.</span>';
+    return;
+  }
+  var header  = decodeJWTPart(parts[0]);
+  var payload = decodeJWTPart(parts[1]);
+  var html = '';
+  html += '<div class="jwt-section-label">Header</div>';
+  html += '<span class="jwt-header-color">' + esc(JSON.stringify(header, null, 2)) + '</span>';
+  html += '\n<div class="jwt-section-label" style="margin-top:12px">Payload</div>';
+  html += '<span class="jwt-payload-color">' + esc(JSON.stringify(payload, null, 2)) + '</span>';
+  html += '\n<div class="jwt-section-label" style="margin-top:12px">Signature</div>';
+  html += '<span class="jwt-sig-color">' + esc(parts[2] || '') + '</span>';
+  decoded.innerHTML = html;
+};
+
+window.copyJWT = function(which) {
+  var id = document.getElementById('jwtTokenSel').value;
+  var t = id ? storedTokens.find(function(x) { return x.id === id; }) : null;
+  if (!t) return;
+  var val = which === 'access' ? (t.accessToken || '') : (t.refreshToken || '');
+  navigator.clipboard.writeText(val).catch(function() {
+    prompt('Copy this token:', val);
+  });
+};
+
+/* ════════════════════════════════════════════════════════════════════
+   KV TOKEN AUTO-FILL
+   ════════════════════════════════════════════════════════════════════ */
+window.kvLoadStoredToken = function() {
+  var id = document.getElementById('kvTokenSel').value;
+  var t = id ? storedTokens.find(function(x) { return x.id === id; }) : null;
+  if (!t) return;
+  document.getElementById('kvRefreshToken').value = t.refreshToken || '';
+  document.getElementById('kvClientId').value     = t.clientId    || '';
+  document.getElementById('kvTenantId').value     = t.tenantId    || '';
+};
 
 /* ════════════════════════════════════════════════════════════════════
    KV RECON (log streaming)

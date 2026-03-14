@@ -340,6 +340,11 @@
       <span class="nav-icon">&#128221;</span><span>KV Recon</span>
     </div>
 
+    <div class="nav-section">Storage</div>
+    <div class="nav-item" data-section="storagerecon">
+      <span class="nav-icon">&#128230;</span><span>Storage Recon</span>
+    </div>
+
     <div class="nav-section">Graph</div>
     <div class="nav-item" data-section="users">
       <span class="nav-icon">&#128100;</span><span>Users</span>
@@ -560,6 +565,69 @@
         </div>
         <div class="card-body">
           <div class="log-box" id="kvLog" role="log" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ STORAGE RECON ══════════════════════════ -->
+    <div class="section" id="sec-storagerecon">
+      <div class="page-title">&#128230; Storage Recon</div>
+      <div class="card">
+        <div class="card-header"><h2>Configuration</h2></div>
+        <div class="card-body">
+          <form id="storageForm" autocomplete="off">
+            <div class="form-grid">
+              <div class="field full">
+                <label>Load from stored token <span style="font-weight:400;color:#484f58">(auto-fills credentials below)</span></label>
+                <select id="storageTokenSel" class="token-sel" onchange="storageLoadStoredToken()">
+                  <option value="">&#8212; manual entry &#8212;</option>
+                </select>
+              </div>
+              <div class="field full">
+                <label>Refresh Token <em>*</em></label>
+                <input type="password" id="storageRefreshToken" data-mono placeholder="0.AROA..." spellcheck="false">
+              </div>
+              <div class="field">
+                <label>Client ID <em>*</em></label>
+                <input type="text" id="storageClientId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" spellcheck="false">
+              </div>
+              <div class="field">
+                <label>Tenant ID <em>*</em></label>
+                <input type="text" id="storageTenantId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" spellcheck="false">
+              </div>
+              <div class="field">
+                <label>Storage Account Name <span style="font-weight:400;color:#484f58">(optional filter)</span></label>
+                <input type="text" id="storageAccountName" placeholder="mystorageaccount" spellcheck="false">
+              </div>
+              <div class="field">
+                <label>Output Path</label>
+                <input type="text" id="storageOutputPath" value="./StorageReconOutput" spellcheck="false">
+              </div>
+              <div class="field full">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                  <input type="checkbox" id="storageListBlobs" style="width:auto">
+                  Enumerate blobs within containers (slower, more detailed)
+                </label>
+              </div>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn-primary" id="storageRunBtn">&#9654; Run Recon</button>
+              <button type="button" class="btn-ghost" id="storageClearBtn">Clear Log</button>
+              <span class="status" id="storageStatus">
+                <span class="spinner" id="storageSpinner"></span>
+                <span id="storageStatusText"></span>
+              </span>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2>Output Log</h2>
+          <span class="log-meta" id="storageLogMeta"></span>
+        </div>
+        <div class="card-body">
+          <div class="log-box" id="storageLog" role="log" aria-live="polite"></div>
         </div>
       </div>
     </div>
@@ -808,7 +876,7 @@
       const id = item.dataset.section;
       document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
       document.getElementById('sec-' + id).classList.add('active');
-      if (id !== 'tokens' && id !== 'kvrecon') {
+      if (id !== 'tokens' && id !== 'kvrecon' && id !== 'storagerecon') {
         refreshTokenSelectors();
       }
     });
@@ -1291,6 +1359,121 @@ window.kvLoadStoredToken = function() {
       clearInterval(timerIv);
       appendLine('[-] ' + err.message);
       showStatus('kv', 'error', '\u2717 Error');
+      runBtn.disabled = false;
+    }
+  });
+})();
+
+/* ══ STORAGE RECON ══ */
+window.storageLoadStoredToken = function() {
+  var sel = document.getElementById('storageTokenSel');
+  var t = storedTokens.find(function(x) { return x.id === sel.value; });
+  if (!t) return;
+  document.getElementById('storageRefreshToken').value = t.refreshToken || '';
+  document.getElementById('storageClientId').value     = t.clientId    || '';
+  document.getElementById('storageTenantId').value     = t.tenantId    || '';
+};
+
+(function initStorageRecon() {
+  var logEl    = document.getElementById('storageLog');
+  var logMeta  = document.getElementById('storageLogMeta');
+  var runBtn   = document.getElementById('storageRunBtn');
+  var clearBtn = document.getElementById('storageClearBtn');
+  var lineCount = 0;
+  var activeES  = null;
+  var startTime = null;
+  var timerIv   = null;
+
+  function classifyLine(t) {
+    if (t.startsWith('[+]'))                            return 'line-ok';
+    if (t.startsWith('[-]'))                            return 'line-fail';
+    if (t.startsWith('[!]'))                            return 'line-warn';
+    if (t.startsWith('[*]'))                            return 'line-info';
+    if (t.startsWith('###') || t.startsWith('# '))     return 'line-banner';
+    if (t.startsWith('===') || t.startsWith('   ===')) return 'line-sep';
+    return 'line-plain';
+  }
+
+  function appendLine(text) {
+    lineCount++;
+    var span = document.createElement('span');
+    span.className   = 'line ' + classifyLine(text);
+    span.textContent = text;
+    logEl.appendChild(span);
+    logEl.appendChild(document.createTextNode('\n'));
+    logEl.scrollTop = logEl.scrollHeight;
+    logMeta.textContent = lineCount + ' lines';
+  }
+
+  clearBtn.addEventListener('click', function() {
+    logEl.textContent = '';
+    lineCount = 0;
+    logMeta.textContent = '';
+    hideStatus('storage');
+  });
+
+  document.getElementById('storageForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var refreshToken      = document.getElementById('storageRefreshToken').value.trim();
+    var clientId          = document.getElementById('storageClientId').value.trim();
+    var tenantId          = document.getElementById('storageTenantId').value.trim();
+    var storageAccountName = document.getElementById('storageAccountName').value.trim();
+    var outputPath        = document.getElementById('storageOutputPath').value.trim() || './StorageReconOutput';
+    var listBlobs         = document.getElementById('storageListBlobs').checked;
+
+    if (!refreshToken || !clientId || !tenantId) {
+      alert('Refresh Token, Client ID, and Tenant ID are required.');
+      return;
+    }
+    if (activeES) { activeES.close(); activeES = null; }
+
+    runBtn.disabled     = true;
+    logEl.textContent   = '';
+    lineCount = 0;
+    logMeta.textContent = '';
+    startTime = Date.now();
+    clearInterval(timerIv);
+    timerIv = setInterval(function() {
+      var s = ((Date.now() - startTime)/1000).toFixed(0);
+      document.getElementById('storageStatusText').textContent = 'Running \u2014 ' + s + 's';
+    }, 1000);
+    showStatus('storage', 'running', 'Running \u2014 0s');
+
+    try {
+      var resp = await fetch('/storage-run', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({refreshToken,clientId,tenantId,storageAccountName,outputPath,listBlobs}),
+      });
+      if (!resp.ok) {
+        clearInterval(timerIv);
+        appendLine('[-] Server error: ' + await resp.text());
+        showStatus('storage', 'error', '\u2717 Error');
+        runBtn.disabled = false;
+        return;
+      }
+      var data = await resp.json();
+      activeES = new EventSource('/storage-stream/' + data.id);
+      activeES.onmessage = function(ev) {
+        try { appendLine(JSON.parse(ev.data)); } catch(_) { appendLine(ev.data); }
+      };
+      activeES.addEventListener('done', function() {
+        activeES.close(); activeES = null;
+        clearInterval(timerIv);
+        var elapsed = ((Date.now() - startTime)/1000).toFixed(1);
+        showStatus('storage', 'done', '\u2713 Complete \u2014 ' + elapsed + 's');
+        runBtn.disabled = false;
+      });
+      activeES.onerror = function() {
+        if (activeES) { activeES.close(); activeES = null; }
+        clearInterval(timerIv);
+        showStatus('storage', 'error', '\u2717 Connection lost');
+        runBtn.disabled = false;
+      };
+    } catch(err) {
+      clearInterval(timerIv);
+      appendLine('[-] ' + err.message);
+      showStatus('storage', 'error', '\u2717 Error');
       runBtn.disabled = false;
     }
   });

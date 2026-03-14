@@ -35,12 +35,13 @@ Comprehensive cheat sheets for enumerating Azure resources and Microsoft 365 / E
 
 ### [KeyVault](./KeyVault/)
 
-Scripts for obtaining Key Vault access tokens and auditing Key Vault RBAC permissions.
+Scripts for obtaining Key Vault access tokens and auditing Key Vault RBAC permissions, plus the `kv-recon` all-in-one Azure reconnaissance platform.
 
 - **[Get-AzureKeyVaultAccessTokenFromRefreshToken.ps1](./KeyVault/Get-AzureKeyVaultAccessTokenFromRefreshToken.ps1)** — Exchanges an Azure AD OAuth refresh token for a new access token scoped to Azure Key Vault (`https://vault.azure.net/.default`) via the Microsoft identity platform token endpoint.
 - **[Get-KeyVaultRBACPermissions.ps1](./KeyVault/Get-KeyVaultRBACPermissions.ps1)** — Queries the Azure Resource Manager (ARM) REST API to retrieve RBAC permission assignments configured on an Azure Key Vault. Uses the current Azure context to identify the vault and authenticates with a management bearer token.
 - **[SecretValue.ps1](./KeyVault/SecretValue.ps1)** — Retrieves a secret value from Azure Key Vault using the Key Vault REST API with a bearer token. Sends a GET request to the Key Vault secrets endpoint with a Key Vault-scoped JWT access token.
 - **[azure_keyvault_access_explanation.md](./KeyVault/azure_keyvault_access_explanation.md)** — Deep-dive reference explaining why Azure Key Vault separates management-plane (ARM) access from data-plane access. Covers the two API endpoints, required credentials for data-plane access, Key Vault RBAC data roles, and a red-team perspective on requesting resource-specific tokens from a captured refresh token.
+- **[kv-recon/](./KeyVault/kv-recon/)** — All-in-one Azure red team reconnaissance platform (pure Go, single binary). Provides a browser-based web UI and headless CLI for Key Vault recon, Azure Blob Storage enumeration, Microsoft Graph enumeration (users, devices, applications, service principals, groups, OneDrive, mail, Teams, SharePoint), FOCI token exchange, device code phishing, and persistent token storage. See the [kv-recon README](./KeyVault/kv-recon/README.md) for full usage.
 
 ---
 

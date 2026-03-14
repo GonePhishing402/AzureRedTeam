@@ -1,13 +1,14 @@
 # kv-recon
 
-All-in-one Azure Key Vault reconnaissance CLI tool.  
+All-in-one Azure Key Vault reconnaissance tool with both a browser-based GUI and a headless CLI.  
 Exchanges an OAuth refresh token for ARM and Key Vault access tokens, enumerates vaults, checks RBAC permissions, retrieves secrets, and exports certificates — all from a single compiled binary with no PowerShell, Az module, or C compiler dependency.
 
 ---
 
 ## Features
 
-- CLI interface — all inputs passed as flags; no GUI or C compiler required
+- **Web UI mode** — run `kv-recon.exe` with no flags to open a browser-based form at `http://127.0.0.1:8080`
+- **Headless CLI mode** — pass `-refresh-token`, `-client-id`, and `-tenant-id` flags for scripted/automated use
 - Exchanges a refresh token for both an ARM token and a Key Vault token
 - Discovers the active subscription automatically
 - Enumerates all Key Vaults in the subscription (or targets a specific vault)
@@ -17,7 +18,7 @@ Exchanges an OAuth refresh token for ARM and Key Vault access tokens, enumerates
   - **PFX** (PKCS#12, includes private key when stored in Key Vault)
   - **PEM** (public certificate)
   - Falls back to public-cert-only PEM if secrets endpoint access is denied
-- Streams all output live to stdout
+- Streams all output live to the browser log panel or stdout
 - Saves secrets to `{vault}-secrets.txt` and certificates to `.pfx` / `.pem` files
 - Cross-platform: Windows, macOS, Linux (pure Go — no CGo, no external toolchain)
 
@@ -70,6 +71,39 @@ $env:GOOS = "darwin"; go build -o kv-recon .
 
 ## Usage
 
+### Web UI mode (default)
+
+Run with no credential flags to launch the browser-based interface:
+
+```powershell
+.\kv-recon.exe
+# Opens http://127.0.0.1:8080 automatically
+```
+
+Fill in the form and click **▶ Run Recon**. Output streams live in the log panel below the form, color-coded by severity. Secrets and certificates are saved to the configured output directory.
+
+**Web UI flags:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `-addr` | `127.0.0.1` | Address to listen on |
+| `-port` | `8080` | Port to listen on |
+| `-no-open` | — | Do not auto-open the browser |
+
+```powershell
+# Listen on all interfaces (e.g. from a remote jump host)
+.\kv-recon.exe -addr 0.0.0.0 -port 9000
+
+# Start server without auto-opening browser
+.\kv-recon.exe -no-open
+```
+
+---
+
+### Headless CLI mode
+
+Provide credential flags to skip the web UI and run directly to stdout:
+
 ```
 kv-recon -refresh-token <token> -client-id <id> -tenant-id <id> [flags]
 ```
@@ -82,15 +116,11 @@ kv-recon -refresh-token <token> -client-id <id> -tenant-id <id> [flags]
 | `-vault-name` | No | Target a specific vault; omit to enumerate all |
 | `-output` | No | Directory for saved output (default: `./KVReconOutput`) |
 
-All output is written to stdout. Secrets and certificates are also saved to the output directory.
-
-### Examples
-
 ```powershell
 # Enumerate all vaults in a subscription
 .\kv-recon.exe -refresh-token "0.AROA..." -client-id "<appId>" -tenant-id "<tenantId>"
 
-# Target a specific vault and redirect output to a log file
+# Target a specific vault and tee output to a log file
 .\kv-recon.exe -refresh-token "0.AROA..." -client-id "<appId>" -tenant-id "<tenantId>" `
     -vault-name "my-vault" -output "C:\Loot\KVRecon" | Tee-Object recon.log
 
@@ -150,6 +180,16 @@ $clientId = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"   # Azure CLI public client
 ```
 
 ### Step 5 — Run the recon
+
+**Option A — Web UI (recommended)**
+
+```powershell
+.\kv-recon.exe
+# Browser opens automatically at http://127.0.0.1:8080
+# Fill in the form and click ▶ Run Recon
+```
+
+**Option B — Headless CLI**
 
 ```powershell
 # Enumerate ALL vaults in the subscription
@@ -248,7 +288,9 @@ Lists all certificates via `GET /certificates` (paginated), retrieves metadata v
 
 ```
 kv-recon/
-  main.go       — CLI entry point: flag parsing, stdin validation, stdout log drain
+  main.go       — Entry point: detects web UI vs headless CLI mode
+  server.go     — HTTP server, SSE log streaming, browser auto-open
+  ui/index.html — Embedded single-page web UI (dark theme)
   recon.go      — Orchestrator: runs all phases in order
   tokens.go     — OAuth refresh token exchange
   arm.go        — Subscription discovery, vault enumeration, RBAC

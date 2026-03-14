@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>kv-recon — Azure Key Vault Recon</title>
+  <style>
+    :root {
+      --bg:      #0d1117;
+      --surface: #161b22;
+      --overlay: #21262d;
+      --border:  #30363d;
+      --text:    #e6edf3;
+      --muted:   #8b949e;
+      --accent:  #388bfd;
+      --green:   #3fb950;
+      --red:     #f85149;
+      --yellow:  #e3b341;
+      --cyan:    #79c0ff;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── Header ──────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    header h1 { font-size: 16px; font-weight: 600; margin: 0; }
+    .pill {
+      font-size: 11px;
+      font-weight: 500;
+      background: var(--overlay);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    /* ── Layout ──────────────────────────────────────────── */
+    main {
+      max-width: 960px;
+      margin: 24px auto;
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ── Card ─────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-header h2 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 0;
+    }
+    .card-body { padding: 16px; }
+
+    /* ── Form ─────────────────────────────────────────────── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .field      { display: flex; flex-direction: column; gap: 5px; }
+    .field.full { grid-column: 1 / -1; }
+    label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+    }
+    label em { font-style: normal; color: var(--red); }
+    input {
+      background: var(--overlay);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: "SFMono-Regular", ui-monospace, Consolas, "Liberation Mono", Menlo, monospace;
+      padding: 7px 10px;
+      transition: border-color 0.12s;
+      width: 100%;
+    }
+    input::placeholder { color: #484f58; }
+    input:focus { outline: none; border-color: var(--accent); }
+
+    /* ── Buttons ──────────────────────────────────────────── */
+    .actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+    button {
+      border: 1px solid transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 7px 16px;
+      transition: opacity 0.12s, background 0.12s;
+      white-space: nowrap;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-run {
+      background: #1f6feb;
+      border-color: rgba(240,246,252,0.1);
+      color: #fff;
+    }
+    .btn-run:hover:not(:disabled) { background: #388bfd; }
+    .btn-clear {
+      background: var(--overlay);
+      border-color: var(--border);
+      color: var(--text);
+    }
+    .btn-clear:hover:not(:disabled) { background: #30363d; }
+
+    /* ── Status Badge ─────────────────────────────────────── */
+    .status {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+    .status.show { display: inline-flex; }
+    .status.running {
+      background: rgba(56,139,253,0.15);
+      border: 1px solid rgba(56,139,253,0.4);
+      color: #58a6ff;
+    }
+    .status.done {
+      background: rgba(63,185,80,0.15);
+      border: 1px solid rgba(63,185,80,0.4);
+      color: var(--green);
+    }
+    .status.error {
+      background: rgba(248,81,73,0.15);
+      border: 1px solid rgba(248,81,73,0.4);
+      color: var(--red);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 11px; height: 11px;
+      border: 2px solid rgba(88,166,255,0.3);
+      border-top-color: #58a6ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    /* ── Log Panel ────────────────────────────────────────── */
+    .log-meta { font-size: 12px; color: var(--muted); }
+    #log {
+      background: #010409;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: "SFMono-Regular", ui-monospace, Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 12px;
+      height: 500px;
+      line-height: 1.65;
+      overflow-y: auto;
+      padding: 12px 14px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .line        { display: block; }
+    .line-ok     { color: var(--green); }
+    .line-fail   { color: var(--red); }
+    .line-warn   { color: var(--yellow); }
+    .line-info   { color: var(--cyan); }
+    .line-banner { color: #484f58; }
+    .line-sep    { color: #3d444d; }
+    .line-plain  { color: #c9d1d9; }
+
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .field.full { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="18" height="18" viewBox="0 0 16 16" fill="#8b949e" aria-hidden="true">
+    <path d="M8.878.392a1.75 1.75 0 0 0-1.756 0l-5.25 3.045A1.75 1.75 0 0 0 1 4.951v6.098c0 .624.332 1.2.872 1.514l5.25 3.045a1.75 1.75 0 0 0 1.756 0l5.25-3.045c.54-.313.872-.89.872-1.514V4.951c0-.624-.332-1.2-.872-1.514L8.878.392ZM7.875 1.69a.25.25 0 0 1 .25 0l4.63 2.685L8 6.22 3.245 4.375Zm-5.125 3.5 4.75 1.862v5.44l-4.625-2.682a.25.25 0 0 1-.125-.216V5.19Zm6.25 7.302v-5.44l4.75-1.862v5.404a.25.25 0 0 1-.125.216L9 12.492Z"/>
+  </svg>
+  <h1>kv-recon</h1>
+  <span class="pill">Azure Key Vault Recon</span>
+</header>
+
+<main>
+
+  <!-- Configuration card -->
+  <div class="card">
+    <div class="card-header"><h2>Configuration</h2></div>
+    <div class="card-body">
+      <form id="form" autocomplete="off">
+        <div class="form-grid">
+
+          <div class="field full">
+            <label>Refresh Token <em>*</em></label>
+            <input type="password" id="fRefreshToken"
+                   placeholder="0.AROA..."
+                   spellcheck="false">
+          </div>
+
+          <div class="field">
+            <label>Client ID <em>*</em></label>
+            <input type="text" id="fClientId"
+                   placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                   spellcheck="false">
+          </div>
+
+          <div class="field">
+            <label>Tenant ID <em>*</em></label>
+            <input type="text" id="fTenantId"
+                   placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                   spellcheck="false">
+          </div>
+
+          <div class="field">
+            <label>Vault Name
+              <span style="font-weight:400;color:#484f58">(optional — blank enumerates all)</span>
+            </label>
+            <input type="text" id="fVaultName"
+                   placeholder="my-vault"
+                   spellcheck="false">
+          </div>
+
+          <div class="field">
+            <label>Output Path</label>
+            <input type="text" id="fOutputPath"
+                   value="./KVReconOutput"
+                   spellcheck="false">
+          </div>
+
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn-run" id="runBtn">&#9654; Run Recon</button>
+          <button type="button" class="btn-clear" id="clearBtn">Clear Log</button>
+          <span class="status" id="status">
+            <span class="spinner" id="spinner"></span>
+            <span id="statusText"></span>
+          </span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Log card -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Output Log</h2>
+      <span class="log-meta" id="logMeta"></span>
+    </div>
+    <div class="card-body">
+      <div id="log" role="log" aria-live="polite" aria-atomic="false"></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  const form       = document.getElementById('form');
+  const runBtn     = document.getElementById('runBtn');
+  const clearBtn   = document.getElementById('clearBtn');
+  const logEl      = document.getElementById('log');
+  const statusEl   = document.getElementById('status');
+  const statusText = document.getElementById('statusText');
+  const spinnerEl  = document.getElementById('spinner');
+  const logMeta    = document.getElementById('logMeta');
+
+  let lineCount    = 0;
+  let activeES     = null;
+  let startTime    = null;
+  let timerIv      = null;
+
+  /* ── Status ────────────────────────────────────────────── */
+  function setStatus(state, text) {
+    statusEl.className   = 'status show ' + state;
+    statusText.textContent = text;
+    spinnerEl.style.display = (state === 'running') ? 'block' : 'none';
+  }
+  function clearStatus() {
+    statusEl.className = 'status';
+    spinnerEl.style.display = 'none';
+  }
+
+  /* ── Timer ─────────────────────────────────────────────── */
+  function startTimer() {
+    startTime = Date.now();
+    clearInterval(timerIv);
+    timerIv = setInterval(function () {
+      var s = ((Date.now() - startTime) / 1000).toFixed(0);
+      statusText.textContent = 'Running \u2014 ' + s + 's';
+    }, 1000);
+  }
+  function stopTimer() {
+    clearInterval(timerIv);
+    timerIv = null;
+  }
+
+  /* ── Log ───────────────────────────────────────────────── */
+  function classifyLine(t) {
+    if (t.startsWith('[+]'))                           return 'line-ok';
+    if (t.startsWith('[-]'))                           return 'line-fail';
+    if (t.startsWith('[!]'))                           return 'line-warn';
+    if (t.startsWith('[*]'))                           return 'line-info';
+    if (t.startsWith('###') || t.startsWith('# '))    return 'line-banner';
+    if (t.startsWith('===') || t.startsWith('   ===')) return 'line-sep';
+    return 'line-plain';
+  }
+
+  function appendLine(text) {
+    lineCount++;
+    var span = document.createElement('span');
+    span.className   = 'line ' + classifyLine(text);
+    span.textContent = text;
+    logEl.appendChild(span);
+    logEl.appendChild(document.createTextNode('\n'));
+    logEl.scrollTop = logEl.scrollHeight;
+    logMeta.textContent = lineCount + ' lines';
+  }
+
+  /* ── Clear ─────────────────────────────────────────────── */
+  clearBtn.addEventListener('click', function () {
+    logEl.textContent = '';
+    lineCount = 0;
+    logMeta.textContent = '';
+    clearStatus();
+  });
+
+  /* ── Submit ────────────────────────────────────────────── */
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    var refreshToken = document.getElementById('fRefreshToken').value.trim();
+    var clientId     = document.getElementById('fClientId').value.trim();
+    var tenantId     = document.getElementById('fTenantId').value.trim();
+    var vaultName    = document.getElementById('fVaultName').value.trim();
+    var outputPath   = document.getElementById('fOutputPath').value.trim() || './KVReconOutput';
+
+    if (!refreshToken || !clientId || !tenantId) {
+      alert('Refresh Token, Client ID, and Tenant ID are all required.');
+      return;
+    }
+
+    if (activeES) { activeES.close(); activeES = null; }
+
+    runBtn.disabled     = true;
+    logEl.textContent   = '';
+    lineCount           = 0;
+    logMeta.textContent = '';
+    startTimer();
+    setStatus('running', 'Running \u2014 0s');
+
+    /* 1. POST /run — start the recon, get a stream ID back */
+    var runId;
+    try {
+      var resp = await fetch('/run', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ refreshToken, clientId, tenantId, vaultName, outputPath }),
+      });
+      if (!resp.ok) {
+        var msg = await resp.text();
+        stopTimer();
+        appendLine('[-] Server error: ' + msg);
+        setStatus('error', '\u2717 Error');
+        runBtn.disabled = false;
+        return;
+      }
+      var data = await resp.json();
+      runId = data.id;
+    } catch (err) {
+      stopTimer();
+      appendLine('[-] Fetch failed: ' + err.message);
+      setStatus('error', '\u2717 Error');
+      runBtn.disabled = false;
+      return;
+    }
+
+    /* 2. Open SSE stream — receive log lines in real time */
+    activeES = new EventSource('/stream/' + runId);
+
+    activeES.onmessage = function (ev) {
+      try { appendLine(JSON.parse(ev.data)); }
+      catch (_) { appendLine(ev.data); }
+    };
+
+    activeES.addEventListener('done', function () {
+      activeES.close();
+      activeES = null;
+      stopTimer();
+      var elapsed = startTime ? ((Date.now() - startTime) / 1000).toFixed(1) : '?';
+      setStatus('done', '\u2713 Complete \u2014 ' + elapsed + 's');
+      runBtn.disabled = false;
+    });
+
+    activeES.onerror = function () {
+      if (activeES) { activeES.close(); activeES = null; }
+      stopTimer();
+      setStatus('error', '\u2717 Connection lost');
+      runBtn.disabled = false;
+    };
+  });
+
+})();
+</script>
+</body>
+</html>

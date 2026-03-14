@@ -14,7 +14,7 @@ func RunRecon(cfg ReconConfig, logCh chan<- string) {
 	logBanner(logCh, "PHASE 1 — TOKEN ACQUISITION")
 
 	logInfo(logCh, "Requesting ARM access token (management.azure.com)...")
-	armToken, err := exchangeToken(
+	armToken, _, _, err := exchangeToken(
 		cfg.TenantID, cfg.ClientID, cfg.RefreshToken,
 		"https://management.azure.com/.default",
 	)
@@ -25,7 +25,7 @@ func RunRecon(cfg ReconConfig, logCh chan<- string) {
 	logOK(logCh, "ARM token acquired. Preview: %s", tokenPreview(armToken))
 
 	logInfo(logCh, "Requesting Key Vault access token (vault.azure.net)...")
-	kvToken, err := exchangeToken(
+	kvToken, _, _, err := exchangeToken(
 		cfg.TenantID, cfg.ClientID, cfg.RefreshToken,
 		"https://vault.azure.net/.default",
 	)

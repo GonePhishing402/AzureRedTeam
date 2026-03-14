@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -49,7 +51,15 @@ func openDB() error {
 }
 
 // SaveToken writes (or overwrites) a TokenEntry keyed by its ID.
+// If t.ID is empty a random 8-byte hex ID is generated automatically.
 func SaveToken(t TokenEntry) error {
+	if t.ID == "" {
+		b := make([]byte, 8)
+		if _, err := rand.Read(b); err != nil {
+			return fmt.Errorf("generate id: %w", err)
+		}
+		t.ID = hex.EncodeToString(b)
+	}
 	data, err := json.Marshal(t)
 	if err != nil {
 		return err

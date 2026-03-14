@@ -6,7 +6,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
@@ -46,6 +48,10 @@ func StartServer(addr, port string, openBrowser bool) {
 	// Token management
 	mux.HandleFunc("/api/tokens", handleTokens)
 	mux.HandleFunc("/api/tokens/", handleTokenByID)
+
+	// Device code flow
+	mux.HandleFunc("/api/devicecode/start", handleDeviceCodeStart)
+	mux.HandleFunc("/api/devicecode/stream/", handleDeviceCodeStream)
 
 	// Graph enumeration
 	mux.HandleFunc("/api/graph/users", handleGraphUsers)
@@ -465,4 +471,232 @@ func handleGraphOneDrive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, results)
+}
+
+// ── Device Code Flow ──────────────────────────────────────────────────────────
+
+type dcSession struct {
+	resultCh chan dcResult
+}
+
+type dcResult struct {
+	entry *TokenEntry
+	err   string
+}
+
+var (
+	dcMu       sync.Mutex
+	dcSessions = make(map[string]*dcSession)
+)
+
+// deviceCodeResponse is the response from the device auth endpoint.
+type deviceCodeResponse struct {
+	DeviceCode      string `json:"device_code"`
+	UserCode        string `json:"user_code"`
+	VerificationURI string `json:"verification_uri"`
+	ExpiresIn       int    `json:"expires_in"`
+	Interval        int    `json:"interval"`
+	Message         string `json:"message"`
+	Error           string `json:"error"`
+	ErrorDesc       string `json:"error_description"`
+}
+
+// handleDeviceCodeStart initiates a device code flow.
+// POST /api/devicecode/start  body: {tenantId, clientId, scope}
+// Returns: {sessionId, userCode, verificationUri, message, expiresIn}
+func handleDeviceCodeStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		TenantID string `json:"tenantId"`
+		ClientID string `json:"clientId"`
+		Scope    string `json:"scope"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	if req.TenantID == "" || req.ClientID == "" {
+		jsonError(w, "tenantId and clientId are required", http.StatusBadRequest)
+		return
+	}
+	if req.Scope == "" {
+		req.Scope = "https://graph.microsoft.com/.default offline_access"
+	}
+
+	// Call the device auth endpoint.
+	endpoint := "https://login.microsoftonline.com/" + req.TenantID + "/oauth2/v2.0/devicecode"
+	form := url.Values{"client_id": {req.ClientID}, "scope": {req.Scope}}
+	resp, err := http.Post(endpoint, "application/x-www-form-urlencoded", strings.NewReader(form.Encode())) //nolint:gosec
+	if err != nil {
+		jsonError(w, "device code request failed: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	var dc deviceCodeResponse
+	if err := json.Unmarshal(body, &dc); err != nil {
+		jsonError(w, "parse device code response: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	if dc.Error != "" {
+		jsonError(w, dc.Error+": "+dc.ErrorDesc, http.StatusBadGateway)
+		return
+	}
+
+	// Create a session and start background polling.
+	sessionID := newRunID()
+	sess := &dcSession{resultCh: make(chan dcResult, 1)}
+	dcMu.Lock()
+	dcSessions[sessionID] = sess
+	dcMu.Unlock()
+
+	interval := dc.Interval
+	if interval < 5 {
+		interval = 5
+	}
+	expiresIn := dc.ExpiresIn
+	if expiresIn == 0 {
+		expiresIn = 900
+	}
+
+	go func() {
+		defer func() {
+			// Clean up session after 20 minutes regardless.
+			time.AfterFunc(20*time.Minute, func() {
+				dcMu.Lock()
+				delete(dcSessions, sessionID)
+				dcMu.Unlock()
+			})
+		}()
+
+		deadline := time.Now().Add(time.Duration(expiresIn) * time.Second)
+		tokenEndpoint := "https://login.microsoftonline.com/" + req.TenantID + "/oauth2/v2.0/token"
+
+		for time.Now().Before(deadline) {
+			time.Sleep(time.Duration(interval) * time.Second)
+
+			pollForm := url.Values{
+				"grant_type":  {"urn:ietf:params:oauth:grant-type:device_code"},
+				"client_id":   {req.ClientID},
+				"device_code": {dc.DeviceCode},
+			}
+			pr, err := http.Post(tokenEndpoint, "application/x-www-form-urlencoded", strings.NewReader(pollForm.Encode())) //nolint:gosec
+			if err != nil {
+				continue
+			}
+			pb, _ := io.ReadAll(pr.Body)
+			pr.Body.Close()
+
+			var tr TokenResponse
+			if err := json.Unmarshal(pb, &tr); err != nil {
+				continue
+			}
+
+			switch tr.Error {
+			case "":
+				// Success.
+				if tr.AccessToken == "" {
+					continue
+				}
+				refreshToken := tr.RefreshToken
+				if refreshToken == "" {
+					refreshToken = ""
+				}
+				expiresInSec := tr.ExpiresIn
+				if expiresInSec == 0 {
+					expiresInSec = 3600
+				}
+				entry := TokenEntry{
+					Label:        parseJWTLabel(tr.AccessToken),
+					TenantID:     req.TenantID,
+					ClientID:     req.ClientID,
+					AccessToken:  tr.AccessToken,
+					RefreshToken: refreshToken,
+					ExpiresAt:    time.Now().Add(time.Duration(expiresInSec) * time.Second),
+					Scopes:       req.Scope,
+				}
+				if saveErr := SaveToken(entry); saveErr != nil {
+					sess.resultCh <- dcResult{err: "token acquired but save failed: " + saveErr.Error()}
+					return
+				}
+				sess.resultCh <- dcResult{entry: &entry}
+				return
+			case "authorization_pending", "authorization_declined":
+				// Keep polling for pending; abort for declined.
+				if tr.Error == "authorization_declined" {
+					sess.resultCh <- dcResult{err: "authorization declined by user"}
+					return
+				}
+			case "slow_down":
+				interval += 5
+			default:
+				sess.resultCh <- dcResult{err: tr.Error + ": " + tr.ErrorDesc}
+				return
+			}
+		}
+		sess.resultCh <- dcResult{err: "device code expired — user did not authenticate in time"}
+	}()
+
+	respondJSON(w, map[string]interface{}{
+		"sessionId":       sessionID,
+		"userCode":        dc.UserCode,
+		"verificationUri": dc.VerificationURI,
+		"message":         dc.Message,
+		"expiresIn":       expiresIn,
+	})
+}
+
+// handleDeviceCodeStream is an SSE endpoint that fires once when polling completes.
+// GET /api/devicecode/stream/{sessionId}
+func handleDeviceCodeStream(w http.ResponseWriter, r *http.Request) {
+	sessionID := strings.TrimPrefix(r.URL.Path, "/api/devicecode/stream/")
+	if sessionID == "" {
+		http.Error(w, "missing session id", http.StatusBadRequest)
+		return
+	}
+	dcMu.Lock()
+	sess, ok := dcSessions[sessionID]
+	dcMu.Unlock()
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	// Send a heartbeat every 4 seconds so the browser doesn't time out.
+	ticker := time.NewTicker(4 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case res := <-sess.resultCh:
+			if res.err != "" {
+				payload, _ := json.Marshal(map[string]string{"error": res.err})
+				fmt.Fprintf(w, "event: error\ndata: %s\n\n", payload)
+			} else {
+				payload, _ := json.Marshal(res.entry)
+				fmt.Fprintf(w, "event: done\ndata: %s\n\n", payload)
+			}
+			flusher.Flush()
+			return
+		case <-ticker.C:
+			fmt.Fprintf(w, ": heartbeat\n\n")
+			flusher.Flush()
+		case <-r.Context().Done():
+			return
+		}
+	}
 }

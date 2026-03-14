@@ -335,9 +335,63 @@
     <div class="section active" id="sec-tokens">
       <div class="page-title">&#128273; Tokens</div>
 
-      <!-- Add Token form -->
+      <!-- Device Code Phishing -->
       <div class="card">
-        <div class="card-header"><h2>Add Token (Graph scope)</h2></div>
+        <div class="card-header"><h2>&#127981; Device Code Phishing</h2></div>
+        <div class="card-body">
+          <form id="dcForm" autocomplete="off">
+            <div class="form-grid">
+              <div class="field">
+                <label>Tenant ID <em>*</em></label>
+                <input type="text" id="dcTenantId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" spellcheck="false">
+              </div>
+              <div class="field">
+                <label>Client ID</label>
+                <select id="dcClientId">
+                  <option value="04b07795-8ddb-461a-bbee-02f9e1bf7b46">Azure CLI (04b07795)</option>
+                  <option value="1950a258-227b-4e31-a9cf-717495945fc2">Azure PowerShell (1950a258)</option>
+                  <option value="d3590ed6-52b3-4102-aeff-aad2292ab01c">Microsoft Office (d3590ed6)</option>
+                  <option value="custom">Custom…</option>
+                </select>
+              </div>
+              <div class="field" id="dcCustomClientIdField" style="display:none">
+                <label>Custom Client ID <em>*</em></label>
+                <input type="text" id="dcCustomClientId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" spellcheck="false">
+              </div>
+              <div class="field full">
+                <label>Scope</label>
+                <input type="text" id="dcScope" value="https://graph.microsoft.com/.default offline_access" spellcheck="false">
+              </div>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn-primary" id="dcStartBtn">&#9889; Start Device Code Flow</button>
+              <span class="status" id="dcStatus"><span class="spinner"></span><span id="dcStatusText"></span></span>
+            </div>
+          </form>
+
+          <!-- User code display (hidden until started) -->
+          <div id="dcCodeBox" style="display:none;margin-top:16px">
+            <div style="background:#010409;border:1px solid var(--border);border-radius:8px;padding:16px">
+              <div style="font-size:12px;color:var(--muted);margin-bottom:8px">1. Open this URL in any browser (even on another device):</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+                <a id="dcVerifyLink" href="" target="_blank" rel="noopener noreferrer"
+                   style="color:var(--accent);font-size:13px;word-break:break-all"></a>
+              </div>
+              <div style="font-size:12px;color:var(--muted);margin-bottom:6px">2. Enter this code when prompted:</div>
+              <div style="display:flex;align-items:center;gap:12px">
+                <span id="dcUserCode"
+                  style="font-family:monospace;font-size:28px;font-weight:700;letter-spacing:4px;color:var(--cyan)"></span>
+                <button class="btn-ghost btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('dcUserCode').textContent)">&#128203; Copy</button>
+              </div>
+              <div id="dcMessage" style="font-size:12px;color:var(--muted);margin-top:10px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Token (manual refresh token) -->
+      <div class="card">
+        <div class="card-header"><h2>Add Token via Refresh Token</h2></div>
         <div class="card-body">
           <form id="addTokenForm" autocomplete="off">
             <div class="form-grid">
@@ -684,6 +738,94 @@ function setCount(prefix, n) {
 function emptyRow(cols, msg) {
   return '<tr class="empty-row"><td colspan="' + cols + '">' + esc(msg) + '</td></tr>';
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   DEVICE CODE FLOW
+   ════════════════════════════════════════════════════════════════════ */
+(function initDeviceCode() {
+  var clientSel = document.getElementById('dcClientId');
+  var customField = document.getElementById('dcCustomClientIdField');
+
+  clientSel.addEventListener('change', function() {
+    customField.style.display = clientSel.value === 'custom' ? 'flex' : 'none';
+  });
+
+  document.getElementById('dcForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var tenantId = document.getElementById('dcTenantId').value.trim();
+    var clientId = clientSel.value === 'custom'
+      ? document.getElementById('dcCustomClientId').value.trim()
+      : clientSel.value;
+    var scope = document.getElementById('dcScope').value.trim() || 'https://graph.microsoft.com/.default offline_access';
+
+    if (!tenantId || !clientId) {
+      alert('Tenant ID and Client ID are required.');
+      return;
+    }
+
+    var btn = document.getElementById('dcStartBtn');
+    btn.disabled = true;
+    document.getElementById('dcCodeBox').style.display = 'none';
+    showStatus('dc', 'running', 'Requesting device code…');
+
+    var startResp;
+    try {
+      var r = await fetch('/api/devicecode/start', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tenantId, clientId, scope}),
+      });
+      startResp = await r.json();
+      if (!r.ok) throw new Error(startResp.error || r.statusText);
+    } catch(e) {
+      showStatus('dc', 'error', '\u2717 ' + e.message);
+      btn.disabled = false;
+      return;
+    }
+
+    // Show the user code.
+    document.getElementById('dcUserCode').textContent = startResp.userCode;
+    var link = document.getElementById('dcVerifyLink');
+    link.href = startResp.verificationUri;
+    link.textContent = startResp.verificationUri;
+    document.getElementById('dcMessage').textContent = startResp.message || '';
+    document.getElementById('dcCodeBox').style.display = 'block';
+    showStatus('dc', 'running', 'Waiting for authentication…');
+
+    // Stream result via SSE.
+    var es = new EventSource('/api/devicecode/stream/' + startResp.sessionId);
+
+    es.addEventListener('done', async function(ev) {
+      es.close();
+      var token;
+      try { token = JSON.parse(ev.data); } catch(_) {}
+      document.getElementById('dcCodeBox').style.display = 'none';
+      showStatus('dc', 'done', '\u2713 Token saved' + (token && token.label ? ' — ' + token.label : ''));
+      document.getElementById('dcForm').reset();
+      customField.style.display = 'none';
+      btn.disabled = false;
+      await loadTokens();
+      refreshTokenSelectors();
+    });
+
+    es.addEventListener('error', function(ev) {
+      es.close();
+      var msg = 'Authentication failed';
+      try { msg = JSON.parse(ev.data).error || msg; } catch(_) {}
+      showStatus('dc', 'error', '\u2717 ' + msg);
+      document.getElementById('dcCodeBox').style.display = 'none';
+      btn.disabled = false;
+    });
+
+    es.onerror = function() {
+      // Only treat as error if stream hasn't completed normally.
+      if (es.readyState === EventSource.CLOSED) return;
+      es.close();
+      showStatus('dc', 'error', '\u2717 Stream disconnected');
+      btn.disabled = false;
+    };
+  });
+})();
 
 /* ════════════════════════════════════════════════════════════════════
    TOKEN STORE

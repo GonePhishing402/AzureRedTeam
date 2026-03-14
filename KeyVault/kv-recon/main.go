@@ -1,149 +1,60 @@
 package main
 
 import (
-	"os/exec"
-	"runtime"
-
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/widget"
+	"flag"
+	"fmt"
+	"os"
 )
 
 func main() {
-	a := app.New()
-	w := a.NewWindow("Azure Key Vault Recon")
-	w.Resize(fyne.NewSize(860, 720))
+	refreshToken := flag.String("refresh-token", "", "OAuth refresh token (required)")
+	clientID     := flag.String("client-id", "", "Azure AD Application (Client) ID (required)")
+	tenantID     := flag.String("tenant-id", "", "Azure AD Tenant ID (required)")
+	vaultName    := flag.String("vault-name", "", "Target a specific vault (optional — blank enumerates all)")
+	outputPath   := flag.String("output", "./KVReconOutput", "Directory for saved output")
 
-	// ── Form fields ───────────────────────────────────────────────
-	refreshTokenEntry := widget.NewPasswordEntry()
-	refreshTokenEntry.SetPlaceHolder("Required")
+	flag.Parse()
 
-	clientIDEntry := widget.NewEntry()
-	clientIDEntry.SetPlaceHolder("Required")
+	missing := false
+	if *refreshToken == "" {
+		fmt.Fprintln(os.Stderr, "error: -refresh-token is required")
+		missing = true
+	}
+	if *clientID == "" {
+		fmt.Fprintln(os.Stderr, "error: -client-id is required")
+		missing = true
+	}
+	if *tenantID == "" {
+		fmt.Fprintln(os.Stderr, "error: -tenant-id is required")
+		missing = true
+	}
+	if missing {
+		fmt.Fprintln(os.Stderr, "")
+		flag.Usage()
+		os.Exit(1)
+	}
 
-	tenantIDEntry := widget.NewEntry()
-	tenantIDEntry.SetPlaceHolder("Required")
-
-	vaultNameEntry := widget.NewEntry()
-	vaultNameEntry.SetPlaceHolder("Optional — leave blank to enumerate all vaults")
-
-	outputPathEntry := widget.NewEntry()
-	outputPathEntry.SetText("./KVReconOutput")
-
-	form := widget.NewForm(
-		widget.NewFormItem("Refresh Token", refreshTokenEntry),
-		widget.NewFormItem("Client ID", clientIDEntry),
-		widget.NewFormItem("Tenant ID", tenantIDEntry),
-		widget.NewFormItem("Vault Name", vaultNameEntry),
-		widget.NewFormItem("Output Path", outputPathEntry),
-	)
-
-	// ── Log panel ─────────────────────────────────────────────────
-	logEntry := widget.NewMultiLineEntry()
-	logEntry.Disable()
-	logEntry.Wrapping = fyne.TextWrapWord
-	logScroll := container.NewScroll(logEntry)
-	logScroll.SetMinSize(fyne.NewSize(840, 380))
+	cfg := ReconConfig{
+		RefreshToken: *refreshToken,
+		ClientID:     *clientID,
+		TenantID:     *tenantID,
+		VaultName:    *vaultName,
+		OutputPath:   *outputPath,
+		KVAPIVersion: "7.4",
+	}
 
 	logCh := make(chan string, 512)
-
-	// Drain the log channel and append lines to the UI entry.
 	go func() {
-		for msg := range logCh {
-			msg := msg // capture for closure
-			fyne.Do(func() {
-				cur := logEntry.Text
-				if cur == "" {
-					logEntry.SetText(msg)
-				} else {
-					logEntry.SetText(cur + "\n" + msg)
-				}
-				logScroll.ScrollToBottom()
-			})
-		}
+		RunRecon(cfg, logCh)
+		close(logCh)
 	}()
 
-	// ── Buttons ───────────────────────────────────────────────────
-	var runBtn *widget.Button
-
-	clearBtn := widget.NewButton("Clear Log", func() {
-		logEntry.SetText("")
-	})
-
-	openDirBtn := widget.NewButton("Open Output Folder", func() {
-		path := outputPathEntry.Text
-		if path == "" {
-			path = "./KVReconOutput"
-		}
-		var cmd *exec.Cmd
-		switch runtime.GOOS {
-		case "windows":
-			cmd = exec.Command("explorer", path)
-		case "darwin":
-			cmd = exec.Command("open", path)
-		default:
-			cmd = exec.Command("xdg-open", path)
-		}
-		if err := cmd.Start(); err != nil {
-			dialog.ShowError(err, w)
-		}
-	})
-
-	runBtn = widget.NewButton("▶  Run Recon", func() {
-		if refreshTokenEntry.Text == "" || clientIDEntry.Text == "" || tenantIDEntry.Text == "" {
-			dialog.ShowInformation("Missing Fields",
-				"Refresh Token, Client ID, and Tenant ID are all required.", w)
-			return
-		}
-
-		runBtn.Disable()
-		logEntry.SetText("")
-
-		cfg := ReconConfig{
-			RefreshToken: refreshTokenEntry.Text,
-			ClientID:     clientIDEntry.Text,
-			TenantID:     tenantIDEntry.Text,
-			VaultName:    vaultNameEntry.Text,
-			OutputPath:   outputPathEntry.Text,
-			KVAPIVersion: "7.4",
-		}
-		if cfg.OutputPath == "" {
-			cfg.OutputPath = "./KVReconOutput"
-		}
-
-		go func() {
-			RunRecon(cfg, logCh)
-			fyne.Do(func() {
-				runBtn.Enable()
-			})
-		}()
-	})
-
-	// ── Layout ────────────────────────────────────────────────────
-	title := widget.NewLabelWithStyle(
-		"Azure Key Vault Recon",
-		fyne.TextAlignCenter,
-		fyne.TextStyle{Bold: true},
-	)
-
-	buttonBar := container.NewHBox(runBtn, clearBtn, openDirBtn)
-
-	content := container.NewVBox(
-		title,
-		form,
-		widget.NewSeparator(),
-		widget.NewLabel("Output Log"),
-		logScroll,
-		buttonBar,
-	)
-
-	w.SetContent(container.NewPadded(content))
-	w.ShowAndRun()
+	for line := range logCh {
+		fmt.Println(line)
+	}
 }
 
-// ReconConfig holds all parameters collected from the GUI form.
+// ReconConfig holds all parameters for the recon run.
 type ReconConfig struct {
 	RefreshToken string
 	ClientID     string

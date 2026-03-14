@@ -1,13 +1,13 @@
 # kv-recon
 
-All-in-one Azure Key Vault reconnaissance tool with a graphical interface.  
-Exchanges an OAuth refresh token for ARM and Key Vault access tokens, enumerates vaults, checks RBAC permissions, retrieves secrets, and exports certificates — all from a single compiled binary with no PowerShell or Az module dependency.
+All-in-one Azure Key Vault reconnaissance CLI tool.  
+Exchanges an OAuth refresh token for ARM and Key Vault access tokens, enumerates vaults, checks RBAC permissions, retrieves secrets, and exports certificates — all from a single compiled binary with no PowerShell, Az module, or C compiler dependency.
 
 ---
 
 ## Features
 
-- GUI form for entering credentials — refresh token field is masked
+- CLI interface — all inputs passed as flags; no GUI or C compiler required
 - Exchanges a refresh token for both an ARM token and a Key Vault token
 - Discovers the active subscription automatically
 - Enumerates all Key Vaults in the subscription (or targets a specific vault)
@@ -17,9 +17,9 @@ Exchanges an OAuth refresh token for ARM and Key Vault access tokens, enumerates
   - **PFX** (PKCS#12, includes private key when stored in Key Vault)
   - **PEM** (public certificate)
   - Falls back to public-cert-only PEM if secrets endpoint access is denied
-- Streams all output live to a scrollable log panel
+- Streams all output live to stdout
 - Saves secrets to `{vault}-secrets.txt` and certificates to `.pfx` / `.pem` files
-- Cross-platform: Windows, macOS, Linux
+- Cross-platform: Windows, macOS, Linux (pure Go — no CGo, no external toolchain)
 
 ---
 
@@ -39,66 +39,64 @@ Verify:
 go version
 ```
 
-### C Compiler (Windows only — required by Fyne)
-
-Fyne uses CGo and requires GCC on Windows. Install [TDM-GCC](https://jmeubank.github.io/tdm-gcc/):
-
-1. Download and run the TDM-GCC installer
-2. Ensure `gcc` is on your PATH
-
-Verify:
-
-```powershell
-gcc --version
-```
-
 ---
 
 ## Installation
 
 ```powershell
-# Clone the repo (or navigate to the existing folder)
+# Navigate to the tool directory
 cd KeyVault\kv-recon
 
-# Download all dependencies
+# Download dependencies and generate go.sum
 go mod tidy
 
-# Build the binary
+# Build for Windows
 go build -o kv-recon.exe .
 ```
 
-### Cross-compile for Linux
+### Cross-compile
+
+Because the tool is pure Go (no CGo), cross-compilation requires no extra steps:
 
 ```powershell
-$env:GOOS = "linux"
-$env:CGO_ENABLED = "0"
-go build -o kv-recon .
+# Linux
+$env:GOOS = "linux"; go build -o kv-recon .
+
+# macOS
+$env:GOOS = "darwin"; go build -o kv-recon .
 ```
 
 ---
 
 ## Usage
 
-Launch the GUI:
-
-```powershell
-.\kv-recon.exe
+```
+kv-recon -refresh-token <token> -client-id <id> -tenant-id <id> [flags]
 ```
 
-A window will open with the following fields:
-
-| Field | Required | Description |
+| Flag | Required | Description |
 |---|---|---|
-| **Refresh Token** | Yes | OAuth refresh token (input is masked) |
-| **Client ID** | Yes | Azure AD Application (Client) ID |
-| **Tenant ID** | Yes | Azure AD Tenant ID (GUID) |
-| **Vault Name** | No | Target a specific vault; leave blank to enumerate all |
-| **Output Path** | No | Directory for saved output (default: `./KVReconOutput`) |
+| `-refresh-token` | Yes | OAuth refresh token |
+| `-client-id` | Yes | Azure AD Application (Client) ID |
+| `-tenant-id` | Yes | Azure AD Tenant ID (GUID) |
+| `-vault-name` | No | Target a specific vault; omit to enumerate all |
+| `-output` | No | Directory for saved output (default: `./KVReconOutput`) |
 
-Click **▶ Run Recon** to start. Output streams live in the log panel below the form.
+All output is written to stdout. Secrets and certificates are also saved to the output directory.
 
-Use **Clear Log** to reset the log panel.  
-Use **Open Output Folder** to open the output directory in your file manager.
+### Examples
+
+```powershell
+# Enumerate all vaults in a subscription
+.\kv-recon.exe -refresh-token "0.AROA..." -client-id "<appId>" -tenant-id "<tenantId>"
+
+# Target a specific vault and redirect output to a log file
+.\kv-recon.exe -refresh-token "0.AROA..." -client-id "<appId>" -tenant-id "<tenantId>" `
+    -vault-name "my-vault" -output "C:\Loot\KVRecon" | Tee-Object recon.log
+
+# Show help
+.\kv-recon.exe -h
+```
 
 ---
 
@@ -161,7 +159,7 @@ Lists all certificates via `GET /certificates` (paginated), retrieves metadata v
 
 ```
 kv-recon/
-  main.go       — Fyne GUI: form fields, log panel, buttons
+  main.go       — CLI entry point: flag parsing, stdin validation, stdout log drain
   recon.go      — Orchestrator: runs all phases in order
   tokens.go     — OAuth refresh token exchange
   arm.go        — Subscription discovery, vault enumeration, RBAC
@@ -177,5 +175,4 @@ kv-recon/
 
 | Package | Purpose |
 |---|---|
-| [`fyne.io/fyne/v2`](https://fyne.io/) | Cross-platform GUI framework |
 | [`golang.org/x/crypto/pkcs12`](https://pkg.go.dev/golang.org/x/crypto/pkcs12) | PKCS#12 (PFX) decode — not in Go stdlib |

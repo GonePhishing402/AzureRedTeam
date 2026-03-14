@@ -150,7 +150,7 @@
     }
     input::placeholder { color: #484f58; }
     input:focus, select:focus { outline: none; border-color: var(--accent); }
-    select option { background: var(--overlay); }
+    select option { background: var(--overlay); color: var(--text); }
 
     /* ── Buttons ──────────────────────────────────────────── */
     .actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
@@ -1268,13 +1268,13 @@ document.getElementById('usersRunBtn').addEventListener('click', function() {
       var html = '';
       rows.forEach(function(u) {
         html += '<tr>' +
-          '<td>' + fmt(u.DisplayName) + '</td>' +
-          '<td>' + fmt(u.UserPrincipalName) + '</td>' +
-          '<td>' + fmt(u.JobTitle) + '</td>' +
-          '<td>' + fmt(u.Department) + '</td>' +
-          '<td>' + fmt(u.Mail) + '</td>' +
-          '<td>' + boolBadge(u.AccountEnabled) + '</td>' +
-          '<td>' + fmtDate(u.CreatedDateTime) + '</td></tr>';
+          '<td>' + fmt(u.displayName) + '</td>' +
+          '<td>' + fmt(u.userPrincipalName) + '</td>' +
+          '<td>' + fmt(u.jobTitle) + '</td>' +
+          '<td>' + fmt(u.department) + '</td>' +
+          '<td>' + fmt(u.mail) + '</td>' +
+          '<td>' + boolBadge(u.accountEnabled) + '</td>' +
+          '<td>' + fmtDate(u.createdDateTime) + '</td></tr>';
       });
       document.getElementById('usersBody').innerHTML = html || emptyRow(7, 'No users returned.');
     }
@@ -1293,13 +1293,13 @@ document.getElementById('devicesRunBtn').addEventListener('click', function() {
       var html = '';
       rows.forEach(function(d) {
         html += '<tr>' +
-          '<td>' + fmt(d.DisplayName) + '</td>' +
-          '<td>' + fmt(d.OperatingSystem) + '</td>' +
-          '<td>' + fmt(d.OperatingSystemVersion) + '</td>' +
-          '<td>' + boolBadge(d.IsCompliant) + '</td>' +
-          '<td>' + boolBadge(d.IsManaged) + '</td>' +
-          '<td>' + fmt(d.TrustType) + '</td>' +
-          '<td>' + fmtDate(d.ApproximateLastSignInDateTime) + '</td></tr>';
+          '<td>' + fmt(d.displayName) + '</td>' +
+          '<td>' + fmt(d.operatingSystem) + '</td>' +
+          '<td>' + fmt(d.operatingSystemVersion) + '</td>' +
+          '<td>' + boolBadge(d.isCompliant) + '</td>' +
+          '<td>' + boolBadge(d.isManaged) + '</td>' +
+          '<td>' + fmt(d.trustType) + '</td>' +
+          '<td>' + fmtDate(d.approximateLastSignInDateTime) + '</td></tr>';
       });
       document.getElementById('devicesBody').innerHTML = html || emptyRow(7, 'No devices returned.');
     }
@@ -1318,11 +1318,11 @@ document.getElementById('appsRunBtn').addEventListener('click', function() {
       var html = '';
       rows.forEach(function(a) {
         html += '<tr>' +
-          '<td>' + fmt(a.DisplayName) + '</td>' +
-          '<td><span class="token-id">' + esc(a.AppId||'') + '</span></td>' +
-          '<td>' + fmt(a.SignInAudience) + '</td>' +
-          '<td>' + fmt(a.PublisherDomain) + '</td>' +
-          '<td>' + fmtDate(a.CreatedDateTime) + '</td></tr>';
+          '<td>' + fmt(a.displayName) + '</td>' +
+          '<td><span class="token-id">' + esc(a.appId||'') + '</span></td>' +
+          '<td>' + fmt(a.signInAudience) + '</td>' +
+          '<td>' + fmt(a.publisherDomain) + '</td>' +
+          '<td>' + fmtDate(a.createdDateTime) + '</td></tr>';
       });
       document.getElementById('appsBody').innerHTML = html || emptyRow(5, 'No applications returned.');
     }
@@ -1341,11 +1341,11 @@ document.getElementById('approlesRunBtn').addEventListener('click', function() {
       var html = '';
       rows.forEach(function(r) {
         html += '<tr>' +
-          '<td>' + fmt(r.PrincipalDisplayName) + '</td>' +
-          '<td>' + fmt(r.PrincipalType) + '</td>' +
-          '<td>' + fmt(r.ResourceDisplayName) + '</td>' +
-          '<td><span class="token-id">' + esc(r.AppRoleId||'') + '</span></td>' +
-          '<td>' + fmtDate(r.CreatedDateTime) + '</td></tr>';
+          '<td>' + fmt(r.principalDisplayName) + '</td>' +
+          '<td>' + fmt(r.principalType) + '</td>' +
+          '<td>' + fmt(r.resourceDisplayName) + '</td>' +
+          '<td><span class="token-id">' + esc(r.appRoleId||'') + '</span></td>' +
+          '<td>' + fmtDate(r.createdDateTime) + '</td></tr>';
       });
       document.getElementById('approlesBody').innerHTML = html || emptyRow(5, 'No role assignments returned.');
     }
@@ -1363,24 +1363,24 @@ document.getElementById('capsRunBtn').addEventListener('click', function() {
     renderFn: function(rows) {
       var html = '';
       rows.forEach(function(p) {
-        var state = p.State === 'enabled'
+        var state = p.state === 'enabled'
           ? '<span class="badge badge-green">Enabled</span>'
-          : p.State === 'enabledForReportingButNotEnforced'
+          : p.state === 'enabledForReportingButNotEnforced'
             ? '<span class="badge badge-yellow">Report-only</span>'
-            : '<span class="badge badge-gray">' + esc(p.State||'disabled') + '</span>';
-        var incUsers = (p.Conditions && p.Conditions.Users && p.Conditions.Users.IncludeUsers)
-          ? p.Conditions.Users.IncludeUsers.join(', ') : '—';
-        var incApps = (p.Conditions && p.Conditions.Applications && p.Conditions.Applications.IncludeApplications)
-          ? p.Conditions.Applications.IncludeApplications.join(', ') : '—';
-        var grant = (p.GrantControls && p.GrantControls.BuiltInControls)
-          ? p.GrantControls.BuiltInControls.join(', ') : '—';
+            : '<span class="badge badge-gray">' + esc(p.state||'disabled') + '</span>';
+        var incUsers = (p.conditions && p.conditions.users && p.conditions.users.includeUsers)
+          ? p.conditions.users.includeUsers.join(', ') : '—';
+        var incApps = (p.conditions && p.conditions.applications && p.conditions.applications.includeApplications)
+          ? p.conditions.applications.includeApplications.join(', ') : '—';
+        var grant = (p.grantControls && p.grantControls.builtInControls)
+          ? p.grantControls.builtInControls.join(', ') : '—';
         html += '<tr>' +
-          '<td>' + fmt(p.DisplayName) + '</td>' +
+          '<td>' + fmt(p.displayName) + '</td>' +
           '<td>' + state + '</td>' +
           '<td style="max-width:160px">' + esc(incUsers.substring(0,80)) + '</td>' +
           '<td style="max-width:160px">' + esc(incApps.substring(0,80)) + '</td>' +
           '<td>' + esc(grant) + '</td>' +
-          '<td>' + fmtDate(p.CreatedDateTime) + '</td></tr>';
+          '<td>' + fmtDate(p.createdDateTime) + '</td></tr>';
       });
       document.getElementById('capsBody').innerHTML = html || emptyRow(6, 'No policies returned.');
     }
@@ -1398,15 +1398,15 @@ document.getElementById('onedriveRunBtn').addEventListener('click', function() {
     renderFn: function(rows) {
       var html = '';
       rows.forEach(function(f) {
-        var type = f.Folder ? '<span class="badge badge-blue">Folder</span>' : '<span class="badge badge-gray">File</span>';
-        var link = f.WebUrl
-          ? '<a class="tbl-link" href="' + esc(f.WebUrl) + '" target="_blank" rel="noopener noreferrer">Open</a>'
+        var type = f.folder ? '<span class="badge badge-blue">Folder</span>' : '<span class="badge badge-gray">File</span>';
+        var link = f.webUrl
+          ? '<a class="tbl-link" href="' + esc(f.webUrl) + '" target="_blank" rel="noopener noreferrer">Open</a>'
           : '—';
         html += '<tr>' +
-          '<td>' + fmt(f.Name) + '</td>' +
+          '<td>' + fmt(f.name) + '</td>' +
           '<td>' + type + '</td>' +
-          '<td>' + fmtSize(f.Size) + '</td>' +
-          '<td>' + fmtDate(f.LastModifiedDateTime) + '</td>' +
+          '<td>' + fmtSize(f.size) + '</td>' +
+          '<td>' + fmtDate(f.lastModifiedDateTime) + '</td>' +
           '<td>' + link + '</td></tr>';
       });
       document.getElementById('onedriveBody').innerHTML = html || emptyRow(5, 'No files returned.');

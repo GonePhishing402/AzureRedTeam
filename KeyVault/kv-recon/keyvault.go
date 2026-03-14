@@ -158,15 +158,10 @@ func DecodePFXToLeafCert(b64pfx string) (pfxBytes []byte, cert *x509.Certificate
 		return nil, nil, fmt.Errorf("base64 decode: %w", err)
 	}
 
-	// Try modern DecodeChain first (returns private key, leaf cert, CA chain).
-	_, cert, _, err = pkcs12.DecodeChain(pfxBytes, "")
+	_, cert, err = pkcs12.Decode(pfxBytes, "")
 	if err != nil {
-		// Fallback to legacy decoder for vaults that use an older PKCS#12 format.
-		_, cert, err = pkcs12.Decode(pfxBytes, "")
-		if err != nil {
-			// Return the raw bytes even on parse failure so caller can still save the PFX.
-			return pfxBytes, nil, fmt.Errorf("pkcs12 decode: %w", err)
-		}
+		// Return the raw bytes even on parse failure so caller can still save the PFX.
+		return pfxBytes, nil, fmt.Errorf("pkcs12 decode: %w", err)
 	}
 	return pfxBytes, cert, nil
 }

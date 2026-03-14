@@ -271,7 +271,7 @@ func handleTokens(w http.ResponseWriter, r *http.Request) {
 			ExpiresAt:    time.Now().Add(time.Duration(expiresIn) * time.Second),
 			Scopes:       graphScope,
 		}
-		if err := SaveToken(&entry); err != nil {
+		if err := SaveToken(entry); err != nil {
 			jsonError(w, "failed to save token: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -331,7 +331,7 @@ func handleTokenByID(w http.ResponseWriter, r *http.Request) {
 			entry.RefreshToken = newRefresh
 		}
 		entry.ExpiresAt = time.Now().Add(time.Duration(expiresIn) * time.Second)
-		if err := SaveToken(&entry); err != nil {
+		if err := SaveToken(entry); err != nil {
 			jsonError(w, "failed to persist refreshed token: "+err.Error(), http.StatusInternalServerError)
 			return
 		}

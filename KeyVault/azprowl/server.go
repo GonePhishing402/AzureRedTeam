@@ -69,7 +69,7 @@ func StartServer(addr, port string, openBrowser bool) {
 	// Lateral movement — certificate auth
 	mux.HandleFunc("/api/lateral/cert-auth", handleCertAuth)
 
-	fmt.Printf("[*] kv-recon web UI → %s\n", baseURL)
+	fmt.Printf("[*] azprowl web UI → %s\n", baseURL)
 	fmt.Println("[*] Press Ctrl+C to stop.")
 
 	if openBrowser {

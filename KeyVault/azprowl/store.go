@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	dbFileName  = ".kv-recon.db"
+	dbFileName  = ".azprowl.db"
 	tokenBucket = "tokens"
 )
 
@@ -31,7 +31,7 @@ type TokenEntry struct {
 
 var db *bolt.DB
 
-// openDB opens (or creates) ~/.kv-recon.db and ensures the tokens bucket exists.
+// openDB opens (or creates) ~/.azprowl.db and ensures the tokens bucket exists.
 func openDB() error {
 	home, err := os.UserHomeDir()
 	if err != nil {

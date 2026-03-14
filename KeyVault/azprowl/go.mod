@@ -1,4 +1,4 @@
-module kv-recon
+module azprowl
 
 go 1.20
 

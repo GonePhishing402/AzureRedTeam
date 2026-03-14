@@ -1,4 +1,4 @@
-# kv-recon
+# azprowl
 
 All-in-one Azure red team reconnaissance platform with a browser-based web UI and headless CLI.  
 Exchanges an OAuth refresh token for ARM, Key Vault, Storage, and Graph access tokens to enumerate and extract data from Azure and Microsoft 365 environments — all from a single compiled binary with no PowerShell, Az module, or C compiler dependency.
@@ -8,8 +8,8 @@ Exchanges an OAuth refresh token for ARM, Key Vault, Storage, and Graph access t
 ## Features
 
 ### Web UI
-- **Dark-themed single-page app** — run `kv-recon.exe` with no flags to open `http://127.0.0.1:8080`
-- **Persistent token store** — save and manage refresh tokens across sessions (backed by bbolt, stored at `~/.kv-recon.db`); all credential forms support one-click auto-fill from stored tokens
+- **Dark-themed single-page app** — run `azprowl.exe` with no flags to open `http://127.0.0.1:8080`
+- **Persistent token store** — save and manage refresh tokens across sessions (backed by bbolt, stored at `~/.azprowl.db`); all credential forms support one-click auto-fill from stored tokens
 - **JWT Inspector** — paste any JWT to decode the header and claims inline
 - **Device Code Phishing** — initiate an OAuth device code flow and display the user code; captures the resulting refresh token automatically and saves it to the token store
 
@@ -68,13 +68,13 @@ go version
 
 ```powershell
 # Navigate to the tool directory
-cd KeyVault\kv-recon
+cd KeyVault\azprowl
 
 # Download dependencies and generate go.sum
 go mod tidy
 
 # Build for Windows
-go build -o kv-recon.exe .
+go build -o azprowl.exe .
 ```
 
 ### Cross-compile
@@ -83,10 +83,10 @@ Because the tool is pure Go (no CGo), cross-compilation requires no extra steps:
 
 ```powershell
 # Linux
-$env:GOOS = "linux"; go build -o kv-recon .
+$env:GOOS = "linux"; go build -o azprowl .
 
 # macOS
-$env:GOOS = "darwin"; go build -o kv-recon .
+$env:GOOS = "darwin"; go build -o azprowl .
 ```
 
 ---
@@ -98,7 +98,7 @@ $env:GOOS = "darwin"; go build -o kv-recon .
 Run with no credential flags to launch the browser-based interface:
 
 ```powershell
-.\kv-recon.exe
+.\azprowl.exe
 # Opens http://127.0.0.1:8080 automatically
 ```
 
@@ -112,10 +112,10 @@ Run with no credential flags to launch the browser-based interface:
 
 ```powershell
 # Listen on all interfaces (e.g. from a remote jump host)
-.\kv-recon.exe -addr 0.0.0.0 -port 9000
+.\azprowl.exe -addr 0.0.0.0 -port 9000
 
 # Start server without auto-opening browser
-.\kv-recon.exe -no-open
+.\azprowl.exe -no-open
 ```
 
 ---
@@ -125,7 +125,7 @@ Run with no credential flags to launch the browser-based interface:
 Provide credential flags to skip the web UI and run Key Vault recon directly to stdout:
 
 ```
-kv-recon -refresh-token <token> -client-id <id> -tenant-id <id> [flags]
+azprowl -refresh-token <token> -client-id <id> -tenant-id <id> [flags]
 ```
 
 | Flag | Required | Description |
@@ -138,14 +138,14 @@ kv-recon -refresh-token <token> -client-id <id> -tenant-id <id> [flags]
 
 ```powershell
 # Enumerate all vaults in a subscription
-.\kv-recon.exe -refresh-token "0.AROA..." -client-id "<appId>" -tenant-id "<tenantId>"
+.\azprowl.exe -refresh-token "0.AROA..." -client-id "<appId>" -tenant-id "<tenantId>"
 
 # Target a specific vault and tee output to a log file
-.\kv-recon.exe -refresh-token "0.AROA..." -client-id "<appId>" -tenant-id "<tenantId>" `
+.\azprowl.exe -refresh-token "0.AROA..." -client-id "<appId>" -tenant-id "<tenantId>" `
     -vault-name "my-vault" -output "C:\Loot\KVRecon" | Tee-Object recon.log
 
 # Show help
-.\kv-recon.exe -h
+.\azprowl.exe -h
 ```
 
 ---
@@ -163,9 +163,9 @@ go version
 ### Step 2 — Build the binary (one-time)
 
 ```powershell
-cd KeyVault\kv-recon
+cd KeyVault\azprowl
 go mod tidy
-go build -o kv-recon.exe .
+go build -o azprowl.exe .
 ```
 
 ### Step 3 — Obtain a refresh token
@@ -204,7 +204,7 @@ $clientId = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"   # Azure CLI public client
 **Option A — Web UI (recommended)**
 
 ```powershell
-.\kv-recon.exe
+.\azprowl.exe
 # Browser opens automatically at http://127.0.0.1:8080
 # Navigate using the left sidebar:
 #   Tokens        → Save and manage refresh tokens
@@ -219,13 +219,13 @@ $clientId = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"   # Azure CLI public client
 
 ```powershell
 # Enumerate ALL vaults in the subscription
-.\kv-recon.exe `
+.\azprowl.exe `
   -refresh-token "<refresh_token>" `
   -client-id     "<client_id>" `
   -tenant-id     "<tenant_id>"
 
 # Target a SPECIFIC vault and save output to a custom directory
-.\kv-recon.exe `
+.\azprowl.exe `
   -refresh-token "<refresh_token>" `
   -client-id     "<client_id>" `
   -tenant-id     "<tenant_id>" `
@@ -233,7 +233,7 @@ $clientId = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"   # Azure CLI public client
   -output        "C:\Loot\KVRecon"
 
 # Tee output to both stdout and a log file
-.\kv-recon.exe `
+.\azprowl.exe `
   -refresh-token "<refresh_token>" `
   -client-id     "<client_id>" `
   -tenant-id     "<tenant_id>" | Tee-Object -FilePath recon.log
@@ -341,7 +341,7 @@ Lists all blobs within each container. Logs blob name, size, and content type.
 ## Project Structure
 
 ```
-kv-recon/
+azprowl/
   main.go          — Entry point: detects web UI vs headless CLI mode
   server.go        — HTTP server, routes, SSE log streaming, browser auto-open
   ui/index.html    — Embedded single-page web UI (dark theme)
@@ -392,13 +392,13 @@ go version
 
 ```powershell
 # Navigate to the tool directory
-cd KeyVault\kv-recon
+cd KeyVault\azprowl
 
 # Download dependencies and generate go.sum
 go mod tidy
 
 # Build for Windows
-go build -o kv-recon.exe .
+go build -o azprowl.exe .
 ```
 
 ### Cross-compile
@@ -407,10 +407,10 @@ Because the tool is pure Go (no CGo), cross-compilation requires no extra steps:
 
 ```powershell
 # Linux
-$env:GOOS = "linux"; go build -o kv-recon .
+$env:GOOS = "linux"; go build -o azprowl .
 
 # macOS
-$env:GOOS = "darwin"; go build -o kv-recon .
+$env:GOOS = "darwin"; go build -o azprowl .
 ```
 
 ---
@@ -422,7 +422,7 @@ $env:GOOS = "darwin"; go build -o kv-recon .
 Run with no credential flags to launch the browser-based interface:
 
 ```powershell
-.\kv-recon.exe
+.\azprowl.exe
 # Opens http://127.0.0.1:8080 automatically
 ```
 
@@ -438,10 +438,10 @@ Fill in the form and click **▶ Run Recon**. Output streams live in the log pan
 
 ```powershell
 # Listen on all interfaces (e.g. from a remote jump host)
-.\kv-recon.exe -addr 0.0.0.0 -port 9000
+.\azprowl.exe -addr 0.0.0.0 -port 9000
 
 # Start server without auto-opening browser
-.\kv-recon.exe -no-open
+.\azprowl.exe -no-open
 ```
 
 ---
@@ -451,7 +451,7 @@ Fill in the form and click **▶ Run Recon**. Output streams live in the log pan
 Provide credential flags to skip the web UI and run directly to stdout:
 
 ```
-kv-recon -refresh-token <token> -client-id <id> -tenant-id <id> [flags]
+azprowl -refresh-token <token> -client-id <id> -tenant-id <id> [flags]
 ```
 
 | Flag | Required | Description |
@@ -464,14 +464,14 @@ kv-recon -refresh-token <token> -client-id <id> -tenant-id <id> [flags]
 
 ```powershell
 # Enumerate all vaults in a subscription
-.\kv-recon.exe -refresh-token "0.AROA..." -client-id "<appId>" -tenant-id "<tenantId>"
+.\azprowl.exe -refresh-token "0.AROA..." -client-id "<appId>" -tenant-id "<tenantId>"
 
 # Target a specific vault and tee output to a log file
-.\kv-recon.exe -refresh-token "0.AROA..." -client-id "<appId>" -tenant-id "<tenantId>" `
+.\azprowl.exe -refresh-token "0.AROA..." -client-id "<appId>" -tenant-id "<tenantId>" `
     -vault-name "my-vault" -output "C:\Loot\KVRecon" | Tee-Object recon.log
 
 # Show help
-.\kv-recon.exe -h
+.\azprowl.exe -h
 ```
 
 ---
@@ -489,9 +489,9 @@ go version
 ### Step 2 — Build the binary (one-time)
 
 ```powershell
-cd KeyVault\kv-recon
+cd KeyVault\azprowl
 go mod tidy
-go build -o kv-recon.exe .
+go build -o azprowl.exe .
 ```
 
 ### Step 3 — Obtain a refresh token
@@ -530,7 +530,7 @@ $clientId = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"   # Azure CLI public client
 **Option A — Web UI (recommended)**
 
 ```powershell
-.\kv-recon.exe
+.\azprowl.exe
 # Browser opens automatically at http://127.0.0.1:8080
 # Fill in the form and click ▶ Run Recon
 ```
@@ -539,13 +539,13 @@ $clientId = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"   # Azure CLI public client
 
 ```powershell
 # Enumerate ALL vaults in the subscription
-.\kv-recon.exe `
+.\azprowl.exe `
   -refresh-token "<refresh_token>" `
   -client-id     "<client_id>" `
   -tenant-id     "<tenant_id>"
 
 # Target a SPECIFIC vault and save output to a custom directory
-.\kv-recon.exe `
+.\azprowl.exe `
   -refresh-token "<refresh_token>" `
   -client-id     "<client_id>" `
   -tenant-id     "<tenant_id>" `
@@ -553,7 +553,7 @@ $clientId = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"   # Azure CLI public client
   -output        "C:\Loot\KVRecon"
 
 # Tee output to both stdout and a log file
-.\kv-recon.exe `
+.\azprowl.exe `
   -refresh-token "<refresh_token>" `
   -client-id     "<client_id>" `
   -tenant-id     "<tenant_id>" | Tee-Object -FilePath recon.log
@@ -633,7 +633,7 @@ Lists all certificates via `GET /certificates` (paginated), retrieves metadata v
 ## Project Structure
 
 ```
-kv-recon/
+azprowl/
   main.go       — Entry point: detects web UI vs headless CLI mode
   server.go     — HTTP server, SSE log streaming, browser auto-open
   ui/index.html — Embedded single-page web UI (dark theme)

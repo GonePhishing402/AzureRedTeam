@@ -69,6 +69,7 @@ func ListStorageAccounts(armToken, subID, nameFilter string) ([]StorageAccount, 
 
 // GetStorageRBACPermissions returns effective permissions on a storage account.
 func GetStorageRBACPermissions(armToken, subID, resourceGroup, accountName string) ([]Permission, error) {
+
 	uri := fmt.Sprintf(
 		"%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s"+
 			"/providers/Microsoft.Authorization/permissions?api-version=%s",
@@ -78,6 +79,44 @@ func GetStorageRBACPermissions(armToken, subID, resourceGroup, accountName strin
 		return nil, err
 	}
 	return list.Value, nil
+}
+
+// ── Blob Containers via ARM (management plane) ────────────────────────────────
+
+// BlobContainerARM is a blob container returned by the ARM management API.
+// Using ARM avoids the need for data-plane RBAC (Storage Blob Data Reader);
+// only management-plane Reader access is required.
+type BlobContainerARM struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Properties struct {
+		PublicAccess     string `json:"publicAccess"`
+		LastModifiedTime string `json:"lastModifiedTime"`
+	} `json:"properties"`
+}
+
+type blobContainerARMList struct {
+	Value    []BlobContainerARM `json:"value"`
+	NextLink string             `json:"nextLink"`
+}
+
+// ListContainersViaARM lists blob containers using the ARM management API (paginated).
+// This only requires management-plane access and works without data-plane RBAC roles.
+func ListContainersViaARM(armToken, subID, resourceGroup, accountName string) ([]BlobContainerARM, error) {
+	uri := fmt.Sprintf(
+		"%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s"+
+			"/blobServices/default/containers?api-version=%s",
+		armBase, subID, resourceGroup, accountName, armStorageAPI)
+	var all []BlobContainerARM
+	for uri != "" {
+		var page blobContainerARMList
+		if err := armGet(armToken, uri, &page); err != nil {
+			return nil, err
+		}
+		all = append(all, page.Value...)
+		uri = page.NextLink
+	}
+	return all, nil
 }
 
 // ── Blob Storage REST API (XML) ───────────────────────────────────────────────

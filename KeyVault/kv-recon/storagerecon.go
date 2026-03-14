@@ -134,13 +134,13 @@ func RunStorageRecon(cfg StorageReconConfig, logCh chan<- string) {
 		// ── Phase 5 — Container Enumeration ──────────────────────
 		logBanner(logCh, "PHASE 5 — CONTAINERS: "+accountName)
 
-		containers, err := ListContainers(storageToken, accountName)
+		containers, err := ListContainersViaARM(armToken, sub.SubscriptionID, resourceGroup, accountName)
 		if err != nil {
 			logFail(logCh, "Container enumeration failed: %v", err)
 			continue
 		}
 		if len(containers) == 0 {
-			logWarn(logCh, "No containers found (access denied or account is empty).")
+			logWarn(logCh, "No containers found (account is empty or access denied).")
 			continue
 		}
 		logOK(logCh, "Found %d container(s):", len(containers))
@@ -153,15 +153,15 @@ func RunStorageRecon(cfg StorageReconConfig, logCh chan<- string) {
 		)
 
 		for _, c := range containers {
-			publicAccess := c.PublicAccess
+			publicAccess := c.Properties.PublicAccess
 			if publicAccess == "" {
-				publicAccess = "private"
+				publicAccess = "None (private)"
 			}
 			logCh <- fmt.Sprintf("    Container    : %-40s  [access: %s]", c.Name, publicAccess)
 			outputLines = append(outputLines,
 				"Container    : "+c.Name,
 				"Public Access: "+publicAccess,
-				"Last Modified: "+c.LastModified,
+				"Last Modified: "+c.Properties.LastModifiedTime,
 			)
 
 			if !cfg.ListBlobs {

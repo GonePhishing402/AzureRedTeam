@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>strgprowl</title>
+<style>
+:root{
+  --bg:#0d1117;--surface:#161b22;--overlay:#21262d;--border:#30363d;
+  --text:#e6edf3;--muted:#8b949e;--accent:#388bfd;
+  --green:#3fb950;--red:#f85149;--yellow:#e3b341;--cyan:#79c0ff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;display:flex;height:100vh;overflow:hidden}
+
+/* ── Sidebar ── */
+#sidebar{width:200px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+#sidebar header{padding:16px 14px 10px;font-weight:700;font-size:15px;color:var(--cyan);border-bottom:1px solid var(--border)}
+#sidebar nav{padding:8px 0;flex:1}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;color:var(--muted);border-left:3px solid transparent;transition:all .15s}
+.nav-item:hover{color:var(--text);background:var(--overlay)}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(56,139,253,.07)}
+
+/* ── Main area ── */
+#main{flex:1;overflow-y:auto;padding:24px}
+.section{display:none}
+.section.active{display:block}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:18px}
+.card h2{font-size:15px;margin-bottom:14px;color:var(--cyan)}
+
+/* ── Forms ── */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:12px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+label{font-size:12px;color:var(--muted)}
+input,select{background:var(--overlay);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:7px 10px;font-size:13px;width:100%}
+input:focus,select:focus{outline:none;border-color:var(--accent)}
+
+/* ── Buttons ── */
+.btn-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px}
+button{cursor:pointer;border:none;border-radius:5px;font-size:13px;padding:7px 14px;transition:opacity .15s}
+button:hover{opacity:.85}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-ghost{background:var(--overlay);color:var(--text);border:1px solid var(--border)}
+.btn-danger{background:#3d1a1a;color:var(--red);border:1px solid #6e2020}
+.btn-sm{padding:4px 10px;font-size:12px}
+
+/* ── Status badges ── */
+.status{display:none;font-size:12px;padding:3px 9px;border-radius:12px;font-weight:600}
+.status.running{display:inline-block;background:rgba(56,139,253,.15);color:var(--accent)}
+.status.done{display:inline-block;background:rgba(63,185,80,.15);color:var(--green)}
+.status.error{display:inline-block;background:rgba(248,81,73,.15);color:var(--red)}
+.badge{font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;display:inline-block}
+.badge-green{background:rgba(63,185,80,.15);color:var(--green)}
+.badge-red{background:rgba(248,81,73,.15);color:var(--red)}
+.badge-yellow{background:rgba(227,179,65,.15);color:var(--yellow)}
+.badge-gray{background:rgba(139,148,158,.15);color:var(--muted)}
+.badge-blue{background:rgba(56,139,253,.15);color:var(--accent)}
+
+/* ── Log box ── */
+.log-box{background:#0a0e14;border:1px solid var(--border);border-radius:6px;padding:12px;font-family:'Cascadia Code','Courier New',monospace;font-size:12px;height:320px;overflow-y:auto;white-space:pre-wrap;word-break:break-all}
+.line-ok{color:var(--green)}
+.line-fail{color:var(--red)}
+.line-warn{color:var(--yellow)}
+.line-info{color:var(--cyan)}
+.line-banner{color:var(--accent);font-weight:700}
+
+/* ── Tables ── */
+.tbl-wrap{overflow-x:auto;border-radius:6px;border:1px solid var(--border)}
+.tbl-wrap table{width:100%;border-collapse:collapse}
+.tbl-wrap th,.tbl-wrap td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}
+.tbl-wrap th{background:var(--overlay);font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.tbl-wrap tr:last-child td{border-bottom:none}
+.tbl-wrap tr:hover td{background:var(--overlay)}
+.tbl-wrap td{font-size:13px;color:var(--text);word-break:break-all}
+.tbl-wrap td.mono{font-family:monospace;font-size:12px}
+.empty-row td{color:var(--muted);font-style:italic;text-align:center;padding:18px}
+
+/* ── Search bar ── */
+.search-row{display:flex;gap:8px;margin-bottom:10px}
+.search-row input{max-width:320px}
+
+/* ── Blob browser ── */
+#breadcrumb{display:flex;align-items:center;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.crumb{color:var(--accent);cursor:pointer;font-size:13px}
+.crumb:hover{text-decoration:underline}
+.crumb-sep{color:var(--muted)}
+.crumb-current{color:var(--text);font-size:13px}
+
+/* ── Modal ── */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center}
+.modal-backdrop.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:10px;width:min(900px,95vw);max-height:90vh;display:flex;flex-direction:column}
+.modal-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-header h3{font-size:14px;color:var(--cyan);word-break:break-all;padding-right:12px}
+.modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;flex-shrink:0;padding:0 4px}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:14px 18px;overflow-y:auto;flex:1}
+.modal-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:8px}
+.content-viewer{background:#0a0e14;border:1px solid var(--border);border-radius:5px;padding:12px;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:500px;overflow-y:auto;color:var(--text)}
+.img-viewer{max-width:100%;max-height:500px;display:block;margin:0 auto;border-radius:4px}
+.truncated-notice{margin-top:8px;font-size:12px;color:var(--yellow)}
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <header>🗄 strgprowl</header>
+  <nav>
+    <div class="nav-item active" data-section="recon" onclick="showSection('recon',this)">
+      📋 Recon
+    </div>
+    <div class="nav-item" data-section="browser" onclick="showSection('browser',this)">
+      🔍 Blob Browser
+    </div>
+  </nav>
+</div>
+
+<div id="main">
+
+  <!-- ════════════════════════ RECON SECTION ════════════════════════ -->
+  <div id="sec-recon" class="section active">
+    <div class="card">
+      <h2>Storage Recon</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Tenant ID</label>
+          <input id="r-tenant" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+        </div>
+        <div class="form-group">
+          <label>Client ID</label>
+          <input id="r-client" type="text" placeholder="04b07795-8ddb-461a-bbee-02f9e1bf7b46">
+        </div>
+        <div class="form-group">
+          <label>Refresh Token</label>
+          <input id="r-refresh" type="password" placeholder="0.AQAA...">
+        </div>
+        <div class="form-group">
+          <label>Storage Account (optional)</label>
+          <input id="r-account" type="text" placeholder="limit to one account">
+        </div>
+        <div class="form-group">
+          <label>Output Path</label>
+          <input id="r-output" type="text" value="./StorageReconOutput">
+        </div>
+        <div class="form-group">
+          <label>Enumerate Blobs</label>
+          <select id="r-blobs">
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="startRecon()">▶ Run Recon</button>
+        <span id="r-status" class="status"></span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Output Log</h2>
+      <div id="r-log" class="log-box"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════ BLOB BROWSER SECTION ════════════════════════ -->
+  <div id="sec-browser" class="section">
+
+    <!-- Connect card -->
+    <div id="b-connect-card" class="card">
+      <h2>Connect</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Tenant ID</label>
+          <input id="b-tenant" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+        </div>
+        <div class="form-group">
+          <label>Client ID</label>
+          <input id="b-client" type="text" placeholder="04b07795-8ddb-461a-bbee-02f9e1bf7b46">
+        </div>
+        <div class="form-group">
+          <label>Refresh Token</label>
+          <input id="b-refresh" type="password" placeholder="0.AQAA...">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="browserConnect()">🔗 Connect</button>
+        <span id="b-status" class="status"></span>
+      </div>
+    </div>
+
+    <!-- Subscription info (shown after connect) -->
+    <div id="b-sub-info" style="display:none" class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div>
+          <span style="color:var(--muted);font-size:12px">Subscription</span><br>
+          <span id="b-sub-name" style="font-weight:600;color:var(--cyan)"></span>
+          <span id="b-sub-id" style="color:var(--muted);font-size:12px;margin-left:8px"></span>
+        </div>
+        <button class="btn-ghost btn-sm" onclick="browserDisconnect()">Disconnect</button>
+      </div>
+    </div>
+
+    <!-- Breadcrumb + view area (shown after connect) -->
+    <div id="b-browser-area" style="display:none">
+      <div id="breadcrumb">
+        <span class="crumb" onclick="goAccounts()">All Accounts</span>
+      </div>
+
+      <!-- Accounts table -->
+      <div id="b-view-accounts" class="card">
+        <h2>Storage Accounts</h2>
+        <div class="search-row">
+          <input type="text" placeholder="Filter…" oninput="filterTable('tbl-accounts',this.value)">
+          <button class="btn-ghost btn-sm" onclick="loadAccounts()">↺ Refresh</button>
+        </div>
+        <div class="tbl-wrap">
+          <table id="tbl-accounts">
+            <thead><tr>
+              <th>Name</th><th>Location</th><th>Public Access</th><th>HTTPS Only</th><th></th>
+            </tr></thead>
+            <tbody id="tbody-accounts"><tr class="empty-row"><td colspan="5">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Containers table -->
+      <div id="b-view-containers" class="card" style="display:none">
+        <h2>Containers — <span id="containers-account" style="color:var(--muted)"></span></h2>
+        <div class="search-row">
+          <input type="text" placeholder="Filter…" oninput="filterTable('tbl-containers',this.value)">
+          <button class="btn-ghost btn-sm" onclick="loadContainers(currentAccount)">↺ Refresh</button>
+        </div>
+        <div class="tbl-wrap">
+          <table id="tbl-containers">
+            <thead><tr>
+              <th>Name</th><th>Public Access</th><th></th>
+            </tr></thead>
+            <tbody id="tbody-containers"><tr class="empty-row"><td colspan="3">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Blobs table -->
+      <div id="b-view-blobs" class="card" style="display:none">
+        <h2>Blobs — <span id="blobs-container" style="color:var(--muted)"></span></h2>
+        <div class="search-row">
+          <input type="text" placeholder="Filter…" oninput="filterTable('tbl-blobs',this.value)">
+          <button class="btn-ghost btn-sm" onclick="loadBlobs(currentAccount,currentContainer)">↺ Refresh</button>
+        </div>
+        <div class="tbl-wrap">
+          <table id="tbl-blobs">
+            <thead><tr>
+              <th>Name</th><th>Size</th><th>Content-Type</th><th>Last Modified</th><th></th>
+            </tr></thead>
+            <tbody id="tbody-blobs"><tr class="empty-row"><td colspan="5">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /#b-browser-area -->
+  </div><!-- /#sec-browser -->
+
+</div><!-- /#main -->
+
+<!-- ══════════ Blob Viewer Modal ══════════ -->
+<div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Blob Viewer</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-ct" style="font-size:12px;color:var(--muted);margin-bottom:8px"></div>
+      <div id="modal-content"></div>
+      <div id="modal-truncated" class="truncated-notice" style="display:none">
+        ⚠ Content truncated to 512 KB. Use Download for the full file.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost btn-sm" id="modal-copy-btn" onclick="copyModalContent()">📋 Copy</button>
+      <button class="btn-primary btn-sm" id="modal-dl-btn">⬇ Download</button>
+      <button class="btn-ghost btn-sm" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function esc(s){
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function fmtSize(bytes){
+  if(bytes==null)return '—';
+  if(bytes<1024)return bytes+' B';
+  if(bytes<1048576)return (bytes/1024).toFixed(1)+' KB';
+  if(bytes<1073741824)return (bytes/1048576).toFixed(1)+' MB';
+  return (bytes/1073741824).toFixed(2)+' GB';
+}
+
+function publicBadge(val){
+  if(!val||val===''||val==='false'||val==='None')
+    return '<span class="badge badge-green">Private</span>';
+  if(val==='Blob')return '<span class="badge badge-yellow">Blob</span>';
+  if(val==='Container'||val==='true')return '<span class="badge badge-red">Public</span>';
+  return '<span class="badge badge-gray">'+esc(val)+'</span>';
+}
+
+function showStatus(el,state,text){
+  el.className='status '+state;
+  el.textContent=text;
+}
+
+function filterTable(tableId,q){
+  const tbl=document.getElementById(tableId);
+  const q2=q.toLowerCase();
+  for(const tr of tbl.tBodies[0].rows){
+    tr.style.display=tr.textContent.toLowerCase().includes(q2)?'':'none';
+  }
+}
+
+function showSection(name,el){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-'+name).classList.add('active');
+  el.classList.add('active');
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let sessionId=null;
+let currentAccount=null;
+let currentContainer=null;
+let modalDownloadCb=null;
+let rawTextContent=null;
+
+// ── Recon ─────────────────────────────────────────────────────────────────────
+function startRecon(){
+  const tenant=document.getElementById('r-tenant').value.trim();
+  const client=document.getElementById('r-client').value.trim();
+  const refresh=document.getElementById('r-refresh').value.trim();
+  const account=document.getElementById('r-account').value.trim();
+  const output=document.getElementById('r-output').value.trim();
+  const blobs=document.getElementById('r-blobs').value==='true';
+  const statusEl=document.getElementById('r-status');
+  const logEl=document.getElementById('r-log');
+
+  if(!tenant||!client||!refresh){
+    showStatus(statusEl,'error','Tenant, Client, and Refresh Token are required');
+    return;
+  }
+
+  logEl.innerHTML='';
+  showStatus(statusEl,'running','Running…');
+
+  fetch('/api/run',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tenantId:tenant,clientId:client,refreshToken:refresh,
+      account:account,output:output,blobs:blobs})
+  }).then(r=>r.json()).then(data=>{
+    if(data.error){showStatus(statusEl,'error',data.error);return;}
+    const es=new EventSource('/api/stream/'+data.runId);
+    es.onmessage=e=>{
+      const line=JSON.parse(e.data);
+      appendLog(logEl,line);
+    };
+    es.addEventListener('done',()=>{
+      es.close();
+      showStatus(statusEl,'done','Complete');
+    });
+    es.onerror=()=>{
+      es.close();
+      showStatus(statusEl,'error','Stream error');
+    };
+  }).catch(err=>{
+    showStatus(statusEl,'error',err.message);
+  });
+}
+
+function appendLog(el,line){
+  const cls=
+    line.startsWith('[+]')?'line-ok':
+    line.startsWith('[-]')?'line-fail':
+    line.startsWith('[!]')?'line-warn':
+    line.startsWith('[*]')?'line-info':
+    line.startsWith('[===')? 'line-banner':'';
+  const span=document.createElement('span');
+  if(cls)span.className=cls;
+  span.textContent=line+'\n';
+  el.appendChild(span);
+  el.scrollTop=el.scrollHeight;
+}
+
+// ── Browser Connect ───────────────────────────────────────────────────────────
+function browserConnect(){
+  const tenant=document.getElementById('b-tenant').value.trim();
+  const client=document.getElementById('b-client').value.trim();
+  const refresh=document.getElementById('b-refresh').value.trim();
+  const statusEl=document.getElementById('b-status');
+
+  if(!tenant||!client||!refresh){
+    showStatus(statusEl,'error','All three fields are required');
+    return;
+  }
+  showStatus(statusEl,'running','Connecting…');
+
+  fetch('/api/connect',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tenantId:tenant,clientId:client,refreshToken:refresh})
+  }).then(r=>r.json()).then(data=>{
+    if(data.error){showStatus(statusEl,'error',data.error);return;}
+    sessionId=data.sessionId;
+    document.getElementById('b-sub-name').textContent=data.subName||'(unknown)';
+    document.getElementById('b-sub-id').textContent=data.subId||'';
+    document.getElementById('b-connect-card').style.display='none';
+    document.getElementById('b-sub-info').style.display='block';
+    document.getElementById('b-browser-area').style.display='block';
+    showStatus(statusEl,'done','Connected');
+    loadAccounts();
+  }).catch(err=>{
+    showStatus(statusEl,'error',err.message);
+  });
+}
+
+function browserDisconnect(){
+  sessionId=null;
+  currentAccount=null;
+  currentContainer=null;
+  document.getElementById('b-sub-info').style.display='none';
+  document.getElementById('b-browser-area').style.display='none';
+  document.getElementById('b-connect-card').style.display='block';
+  document.getElementById('b-status').className='status';
+}
+
+// ── Accounts ──────────────────────────────────────────────────────────────────
+function goAccounts(){
+  currentAccount=null;
+  currentContainer=null;
+  renderBreadcrumb();
+  document.getElementById('b-view-accounts').style.display='block';
+  document.getElementById('b-view-containers').style.display='none';
+  document.getElementById('b-view-blobs').style.display='none';
+}
+
+function loadAccounts(){
+  const tbody=document.getElementById('tbody-accounts');
+  tbody.innerHTML='<tr class="empty-row"><td colspan="5">Loading…</td></tr>';
+  apiPost('/api/accounts',{}).then(rows=>{
+    if(!rows.length){
+      tbody.innerHTML='<tr class="empty-row"><td colspan="5">No storage accounts found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML=rows.map(a=>`
+      <tr>
+        <td class="mono">${esc(a.name)}</td>
+        <td>${esc(a.location)}</td>
+        <td>${publicBadge(a.publicAccess)}</td>
+        <td>${a.httpsOnly==='true'?'<span class="badge badge-green">Yes</span>':'<span class="badge badge-red">No</span>'}</td>
+        <td><button class="btn-primary btn-sm" onclick="openAccount(${JSON.stringify(esc(a.name))})">Browse</button></td>
+      </tr>`).join('');
+  }).catch(err=>{
+    tbody.innerHTML=`<tr class="empty-row"><td colspan="5" style="color:var(--red)">${esc(err.message)}</td></tr>`;
+  });
+}
+
+// ── Containers ────────────────────────────────────────────────────────────────
+function openAccount(name){
+  // name was already esc'd before JSON.stringify in template — decode it
+  currentAccount=name;
+  currentContainer=null;
+  renderBreadcrumb();
+  document.getElementById('b-view-accounts').style.display='none';
+  document.getElementById('b-view-containers').style.display='block';
+  document.getElementById('b-view-blobs').style.display='none';
+  document.getElementById('containers-account').textContent=name;
+  loadContainers(name);
+}
+
+function loadContainers(account){
+  const tbody=document.getElementById('tbody-containers');
+  tbody.innerHTML='<tr class="empty-row"><td colspan="3">Loading…</td></tr>';
+  apiPost('/api/containers',{accountName:account}).then(rows=>{
+    if(!rows.length){
+      tbody.innerHTML='<tr class="empty-row"><td colspan="3">No containers found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML=rows.map(c=>`
+      <tr>
+        <td class="mono">${esc(c.name)}</td>
+        <td>${publicBadge(c.publicAccess)}</td>
+        <td><button class="btn-primary btn-sm" onclick="openContainer(${JSON.stringify(esc(c.name))})">Browse</button></td>
+      </tr>`).join('');
+  }).catch(err=>{
+    tbody.innerHTML=`<tr class="empty-row"><td colspan="3" style="color:var(--red)">${esc(err.message)}</td></tr>`;
+  });
+}
+
+// ── Blobs ─────────────────────────────────────────────────────────────────────
+function openContainer(name){
+  currentContainer=name;
+  renderBreadcrumb();
+  document.getElementById('b-view-accounts').style.display='none';
+  document.getElementById('b-view-containers').style.display='none';
+  document.getElementById('b-view-blobs').style.display='block';
+  document.getElementById('blobs-container').textContent=name;
+  loadBlobs(currentAccount,name);
+}
+
+function loadBlobs(account,container){
+  const tbody=document.getElementById('tbody-blobs');
+  tbody.innerHTML='<tr class="empty-row"><td colspan="5">Loading…</td></tr>';
+  apiPost('/api/blobs',{accountName:account,containerName:container}).then(rows=>{
+    if(!rows.length){
+      tbody.innerHTML='<tr class="empty-row"><td colspan="5">Container is empty.</td></tr>';
+      return;
+    }
+    tbody.innerHTML=rows.map(b=>`
+      <tr>
+        <td class="mono">${esc(b.name)}</td>
+        <td>${fmtSize(b.size)}</td>
+        <td><span class="badge badge-gray">${esc(b.contentType||'unknown')}</span></td>
+        <td>${esc(b.lastModified)}</td>
+        <td style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn-ghost btn-sm" onclick="viewBlob(${JSON.stringify(esc(b.name))})">👁 View</button>
+          <button class="btn-primary btn-sm" onclick="downloadBlob(${JSON.stringify(esc(b.name))})">⬇ Download</button>
+        </td>
+      </tr>`).join('');
+  }).catch(err=>{
+    tbody.innerHTML=`<tr class="empty-row"><td colspan="5" style="color:var(--red)">${esc(err.message)}</td></tr>`;
+  });
+}
+
+// ── Breadcrumb ────────────────────────────────────────────────────────────────
+function renderBreadcrumb(){
+  const bc=document.getElementById('breadcrumb');
+  let html='<span class="crumb" onclick="goAccounts()">All Accounts</span>';
+  if(currentAccount){
+    html+='<span class="crumb-sep">›</span>';
+    if(currentContainer){
+      html+=`<span class="crumb" onclick="openAccount(${JSON.stringify(currentAccount)})">${esc(currentAccount)}</span>`;
+    } else {
+      html+=`<span class="crumb-current">${esc(currentAccount)}</span>`;
+    }
+  }
+  if(currentContainer){
+    html+='<span class="crumb-sep">›</span>';
+    html+=`<span class="crumb-current">${esc(currentContainer)}</span>`;
+  }
+  bc.innerHTML=html;
+}
+
+// ── Blob Viewer ───────────────────────────────────────────────────────────────
+function viewBlob(name){
+  const backdrop=document.getElementById('modal-backdrop');
+  const titleEl=document.getElementById('modal-title');
+  const ctEl=document.getElementById('modal-ct');
+  const contentEl=document.getElementById('modal-content');
+  const truncEl=document.getElementById('modal-truncated');
+  const dlBtn=document.getElementById('modal-dl-btn');
+
+  titleEl.textContent=name;
+  ctEl.textContent='';
+  contentEl.innerHTML='<span style="color:var(--muted)">Loading…</span>';
+  truncEl.style.display='none';
+  rawTextContent=null;
+  backdrop.classList.add('open');
+
+  // Wire up download button
+  dlBtn.onclick=()=>downloadBlob(name);
+  modalDownloadCb=()=>downloadBlob(name);
+
+  apiPost('/api/blob/content',{
+    accountName:currentAccount,
+    containerName:currentContainer,
+    blobName:name
+  }).then(data=>{
+    ctEl.textContent='Content-Type: '+(data.contentType||'unknown');
+    if(data.truncated)truncEl.style.display='block';
+
+    if(data.encoding==='base64'){
+      // binary — if image, show inline; otherwise warn
+      const ct=data.contentType||'';
+      if(ct.startsWith('image/')){
+        contentEl.innerHTML=`<img class="img-viewer" src="data:${esc(ct)};base64,${data.data}" alt="${esc(name)}">`;
+      } else {
+        contentEl.innerHTML=`<div style="color:var(--yellow);padding:8px">⚠ Binary file (${esc(ct||'unknown type')}).<br>Use the Download button to save it.</div>`;
+      }
+    } else {
+      rawTextContent=data.data;
+      // Pretty-print JSON
+      let display=data.data;
+      if((data.contentType||'').includes('json')){
+        try{display=JSON.stringify(JSON.parse(data.data),null,2);}catch(e){}
+      }
+      contentEl.innerHTML=`<div class="content-viewer">${esc(display)}</div>`;
+    }
+  }).catch(err=>{
+    contentEl.innerHTML=`<div style="color:var(--red)">${esc(err.message)}</div>`;
+  });
+}
+
+function closeModal(){
+  document.getElementById('modal-backdrop').classList.remove('open');
+  rawTextContent=null;
+}
+
+function copyModalContent(){
+  if(rawTextContent!=null){
+    navigator.clipboard.writeText(rawTextContent).catch(()=>{});
+  }
+}
+
+// ── Blob Download ─────────────────────────────────────────────────────────────
+function downloadBlob(name){
+  if(!sessionId)return;
+  // Use fetch + Blob URL so the session header can be sent
+  fetch('/api/blob/download',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Session-Id':sessionId},
+    body:JSON.stringify({
+      accountName:currentAccount,
+      containerName:currentContainer,
+      blobName:name
+    })
+  }).then(r=>{
+    if(!r.ok)return r.json().then(e=>{throw new Error(e.error||r.statusText);});
+    return r.blob();
+  }).then(blob=>{
+    const parts=name.split('/');
+    const filename=parts[parts.length-1]||'blob';
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=filename;
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},2000);
+  }).catch(err=>alert('Download failed: '+err.message));
+}
+
+// ── API helper ────────────────────────────────────────────────────────────────
+function apiPost(path,body){
+  const headers={'Content-Type':'application/json'};
+  if(sessionId)headers['X-Session-Id']=sessionId;
+  return fetch(path,{
+    method:'POST',
+    headers,
+    body:JSON.stringify(body)
+  }).then(r=>r.json()).then(data=>{
+    if(data&&data.error)throw new Error(data.error);
+    return data;
+  });
+}
+</script>
+</body>
+</html>

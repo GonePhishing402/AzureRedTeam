@@ -426,7 +426,10 @@ foreach ($account in $accounts) {
                 $xmlResponse = Invoke-BlobGet -StorageToken $storageToken -Uri $blobUri
 
                 # Collect blobs from this page
-                if ($xmlResponse.EnumerationResults.Blobs.Blob) {
+                if (-not $xmlResponse.PSObject.Properties['EnumerationResults']) {
+                    throw "Unexpected response format — EnumerationResults not found."
+                }
+                if ($xmlResponse.EnumerationResults.Blobs.PSObject.Properties['Blob']) {
                     $allBlobs += $xmlResponse.EnumerationResults.Blobs.Blob
                 }
 

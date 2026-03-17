@@ -107,7 +107,7 @@ func decodeJSON(r *http.Request, out interface{}) error {
 
 // POST /api/connect
 // Body: { tenantId, clientId, refreshToken }
-// Response: { sessionId, subId, subName }
+// Response: { sessionId, subId, subName, armToken, storageToken }
 func handleConnect(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		TenantID     string `json:"tenantId"`
@@ -158,9 +158,11 @@ func handleConnect(w http.ResponseWriter, r *http.Request) {
 	sessionsMu.Unlock()
 
 	respondJSON(w, map[string]string{
-		"sessionId": sid,
-		"subId":     s.SubID,
-		"subName":   s.SubName,
+		"sessionId":    sid,
+		"subId":        s.SubID,
+		"subName":      s.SubName,
+		"armToken":     armToken,
+		"storageToken": storageToken,
 	})
 }
 

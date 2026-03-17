@@ -101,6 +101,15 @@ button:hover{opacity:.85}
 .content-viewer{background:#0a0e14;border:1px solid var(--border);border-radius:5px;padding:12px;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:500px;overflow-y:auto;color:var(--text)}
 .img-viewer{max-width:100%;max-height:500px;display:block;margin:0 auto;border-radius:4px}
 .truncated-notice{margin-top:8px;font-size:12px;color:var(--yellow)}
+
+/* ── Token viewer ── */
+.token-block{margin-bottom:18px}
+.token-block h3{font-size:13px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+.token-raw{background:#0a0e14;border:1px solid var(--border);border-radius:5px;padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;white-space:pre-wrap;color:var(--cyan);max-height:80px;overflow-y:auto}
+.token-decoded{background:#0a0e14;border:1px solid var(--border);border-top:none;border-radius:0 0 5px 5px;padding:10px 12px;font-family:monospace;font-size:11px;white-space:pre-wrap;word-break:break-all;color:var(--text);max-height:220px;overflow-y:auto}
+.token-copy-row{display:flex;gap:6px;margin-top:6px}
+.token-placeholder{color:var(--muted);font-style:italic;font-size:12px;padding:10px 0}
+.persist-note{font-size:11px;color:var(--muted);margin-left:4px}
 </style>
 </head>
 <body>
@@ -114,6 +123,9 @@ button:hover{opacity:.85}
     <div class="nav-item" data-section="browser" onclick="showSection('browser',this)">
       🔍 Blob Browser
     </div>
+    <div class="nav-item" data-section="tokens" onclick="showSection('tokens',this)">
+      🔑 Tokens
+    </div>
   </nav>
 </div>
 
@@ -125,16 +137,16 @@ button:hover{opacity:.85}
       <h2>Storage Recon</h2>
       <div class="form-grid">
         <div class="form-group">
-          <label>Tenant ID</label>
-          <input id="r-tenant" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+          <label>Tenant ID <span class="persist-note">💾 saved</span></label>
+          <input id="r-tenant" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" oninput="saveCreds()">
         </div>
         <div class="form-group">
-          <label>Client ID</label>
-          <input id="r-client" type="text" placeholder="04b07795-8ddb-461a-bbee-02f9e1bf7b46">
+          <label>Client ID <span class="persist-note">💾 saved</span></label>
+          <input id="r-client" type="text" placeholder="04b07795-8ddb-461a-bbee-02f9e1bf7b46" oninput="saveCreds()">
         </div>
         <div class="form-group">
-          <label>Refresh Token</label>
-          <input id="r-refresh" type="password" placeholder="0.AQAA...">
+          <label>Refresh Token <span class="persist-note">💾 saved</span></label>
+          <input id="r-refresh" type="password" placeholder="0.AQAA..." oninput="saveCreds()">
         </div>
         <div class="form-group">
           <label>Storage Account (optional)</label>
@@ -171,20 +183,21 @@ button:hover{opacity:.85}
       <h2>Connect</h2>
       <div class="form-grid">
         <div class="form-group">
-          <label>Tenant ID</label>
-          <input id="b-tenant" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+          <label>Tenant ID <span class="persist-note">💾 saved</span></label>
+          <input id="b-tenant" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" oninput="saveCreds()">
         </div>
         <div class="form-group">
-          <label>Client ID</label>
-          <input id="b-client" type="text" placeholder="04b07795-8ddb-461a-bbee-02f9e1bf7b46">
+          <label>Client ID <span class="persist-note">💾 saved</span></label>
+          <input id="b-client" type="text" placeholder="04b07795-8ddb-461a-bbee-02f9e1bf7b46" oninput="saveCreds()">
         </div>
         <div class="form-group">
-          <label>Refresh Token</label>
-          <input id="b-refresh" type="password" placeholder="0.AQAA...">
+          <label>Refresh Token <span class="persist-note">💾 saved</span></label>
+          <input id="b-refresh" type="password" placeholder="0.AQAA..." oninput="saveCreds()">
         </div>
       </div>
       <div class="btn-row">
         <button class="btn-primary" onclick="browserConnect()">🔗 Connect</button>
+        <button class="btn-ghost btn-sm" onclick="clearCreds()">🗑 Clear Saved</button>
         <span id="b-status" class="status"></span>
       </div>
     </div>
@@ -259,6 +272,48 @@ button:hover{opacity:.85}
       </div>
     </div><!-- /#b-browser-area -->
   </div><!-- /#sec-browser -->
+
+  <!-- ════════════════════════ TOKENS SECTION ════════════════════════ -->
+  <div id="sec-tokens" class="section">
+    <div class="card">
+      <h2>Access Tokens</h2>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Tokens are populated automatically after a successful Connect or Recon run.</p>
+
+      <!-- placeholder when no tokens yet -->
+      <div id="t-placeholder" class="token-placeholder">No tokens yet — run Connect in Blob Browser or start Recon first.</div>
+
+      <!-- token content (hidden until populated) -->
+      <div id="t-content" style="display:none">
+
+        <!-- ARM Token -->
+        <div class="token-block">
+          <h3>🔵 ARM Token (management.azure.com)</h3>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:6px">Encoded (raw JWT)</p>
+          <div id="t-arm-encoded" class="token-raw"></div>
+          <p style="font-size:11px;color:var(--muted);margin:6px 0 4px">Decoded payload</p>
+          <div id="t-arm-decoded" class="token-decoded"></div>
+          <div class="token-copy-row">
+            <button class="btn-ghost btn-sm" onclick="copyToken('t-arm-encoded')">📋 Copy JWT</button>
+            <button class="btn-ghost btn-sm" onclick="copyToken('t-arm-decoded')">📋 Copy Decoded</button>
+          </div>
+        </div>
+
+        <!-- Storage Token -->
+        <div class="token-block">
+          <h3>🟠 Storage Token (*.blob.core.windows.net)</h3>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:6px">Encoded (raw JWT)</p>
+          <div id="t-storage-encoded" class="token-raw"></div>
+          <p style="font-size:11px;color:var(--muted);margin:6px 0 4px">Decoded payload</p>
+          <div id="t-storage-decoded" class="token-decoded"></div>
+          <div class="token-copy-row">
+            <button class="btn-ghost btn-sm" onclick="copyToken('t-storage-encoded')">📋 Copy JWT</button>
+            <button class="btn-ghost btn-sm" onclick="copyToken('t-storage-decoded')">📋 Copy Decoded</button>
+          </div>
+        </div>
+
+      </div><!-- /#t-content -->
+    </div>
+  </div><!-- /#sec-tokens -->
 
 </div><!-- /#main -->
 
@@ -356,6 +411,7 @@ function startRecon(){
     showStatus(statusEl,'error','Tenant, Client, and Refresh Token are required');
     return;
   }
+  saveCreds();
 
   logEl.innerHTML='';
   showStatus(statusEl,'running','Running…');
@@ -411,6 +467,7 @@ function browserConnect(){
     return;
   }
   showStatus(statusEl,'running','Connecting…');
+  saveCreds();
 
   fetch('/api/connect',{
     method:'POST',
@@ -426,6 +483,7 @@ function browserConnect(){
     document.getElementById('b-browser-area').style.display='block';
     showStatus(statusEl,'done','Connected');
     loadAccounts();
+    if(data.armToken||data.storageToken) populateTokens(data.armToken,data.storageToken);
   }).catch(err=>{
     showStatus(statusEl,'error',err.message);
   });
@@ -665,6 +723,71 @@ function downloadBlob(name){
     document.body.appendChild(a);a.click();
     setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},2000);
   }).catch(err=>alert('Download failed: '+err.message));
+}
+
+// ── Credential persistence ───────────────────────────────────────────────────
+const CRED_KEYS={tenant:'strgprowl_tenant',client:'strgprowl_client',refresh:'strgprowl_refresh'};
+
+function saveCreds(){
+  const t=document.getElementById('r-tenant').value.trim();
+  const c=document.getElementById('r-client').value.trim();
+  const r=document.getElementById('r-refresh').value.trim();
+  if(t)localStorage.setItem(CRED_KEYS.tenant,t);
+  if(c)localStorage.setItem(CRED_KEYS.client,c);
+  if(r)localStorage.setItem(CRED_KEYS.refresh,r);
+}
+
+function clearCreds(){
+  Object.values(CRED_KEYS).forEach(k=>localStorage.removeItem(k));
+  ['r-tenant','b-tenant'].forEach(id=>document.getElementById(id).value='');
+  ['r-client','b-client'].forEach(id=>document.getElementById(id).value='');
+  ['r-refresh','b-refresh'].forEach(id=>document.getElementById(id).value='');
+}
+
+function loadCreds(){
+  const t=localStorage.getItem(CRED_KEYS.tenant)||'';
+  const c=localStorage.getItem(CRED_KEYS.client)||'';
+  const r=localStorage.getItem(CRED_KEYS.refresh)||'';
+  ['r-tenant','b-tenant'].forEach(id=>{if(t)document.getElementById(id).value=t;});
+  ['r-client','b-client'].forEach(id=>{if(c)document.getElementById(id).value=c;});
+  ['r-refresh','b-refresh'].forEach(id=>{if(r)document.getElementById(id).value=r;});
+}
+
+document.addEventListener('DOMContentLoaded', loadCreds);
+
+// Sync browser form → recon form (so saveCreds always reads the right inputs)
+document.addEventListener('DOMContentLoaded',()=>{
+  ['b-tenant','b-client','b-refresh'].forEach(bid=>{
+    const rid=bid.replace('b-','r-');
+    document.getElementById(bid).addEventListener('input',()=>{
+      document.getElementById(rid).value=document.getElementById(bid).value;
+    });
+  });
+});
+
+// ── JWT decode + Tokens tab ───────────────────────────────────────────────────
+function decodeJWT(token){
+  try{
+    const parts=token.split('.');
+    if(parts.length<2)return '(not a valid JWT)';
+    // base64url → base64
+    const b64=parts[1].replace(/-/g,'+').replace(/_/g,'/');
+    return JSON.stringify(JSON.parse(atob(b64)),null,2);
+  }catch(e){return '(decode failed: '+e.message+')';}
+}
+
+function populateTokens(armToken,storageToken){
+  document.getElementById('t-arm-encoded').textContent=armToken||'(not available)';
+  document.getElementById('t-arm-decoded').textContent=armToken?decodeJWT(armToken):'(not available)';
+  document.getElementById('t-storage-encoded').textContent=storageToken||'(not available)';
+  document.getElementById('t-storage-decoded').textContent=storageToken?decodeJWT(storageToken):'(not available)';
+  document.getElementById('t-placeholder').style.display='none';
+  document.getElementById('t-content').style.display='block';
+}
+
+function copyToken(elemId){
+  const text=document.getElementById(elemId).textContent;
+  navigator.clipboard.writeText(text).catch(()=>{});
 }
 
 // ── API helper ────────────────────────────────────────────────────────────────

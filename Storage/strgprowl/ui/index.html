@@ -229,7 +229,7 @@ button:hover{opacity:.85}
         <h2>Containers — <span id="containers-account" style="color:var(--muted)"></span></h2>
         <div class="search-row">
           <input type="text" placeholder="Filter…" oninput="filterTable('tbl-containers',this.value)">
-          <button class="btn-ghost btn-sm" onclick="loadContainers(currentAccount)">↺ Refresh</button>
+          <button class="btn-ghost btn-sm" onclick="loadContainers()">↺ Refresh</button>
         </div>
         <div class="tbl-wrap">
           <table id="tbl-containers">
@@ -246,7 +246,7 @@ button:hover{opacity:.85}
         <h2>Blobs — <span id="blobs-container" style="color:var(--muted)"></span></h2>
         <div class="search-row">
           <input type="text" placeholder="Filter…" oninput="filterTable('tbl-blobs',this.value)">
-          <button class="btn-ghost btn-sm" onclick="loadBlobs(currentAccount,currentContainer)">↺ Refresh</button>
+          <button class="btn-ghost btn-sm" onclick="loadBlobs()">↺ Refresh</button>
         </div>
         <div class="tbl-wrap">
           <table id="tbl-blobs">
@@ -338,6 +338,8 @@ let currentAccount=null;
 let currentContainer=null;
 let modalDownloadCb=null;
 let rawTextContent=null;
+// item caches for safe index-based onclick
+let _accounts=[], _containers=[], _blobs=[];
 
 // ── Recon ─────────────────────────────────────────────────────────────────────
 function startRecon(){
@@ -447,6 +449,9 @@ function goAccounts(){
   document.getElementById('b-view-accounts').style.display='block';
   document.getElementById('b-view-containers').style.display='none';
   document.getElementById('b-view-blobs').style.display='none';
+  _accounts=[];
+  _containers=[];
+  _blobs=[];
 }
 
 function loadAccounts(){
@@ -457,13 +462,14 @@ function loadAccounts(){
       tbody.innerHTML='<tr class="empty-row"><td colspan="5">No storage accounts found.</td></tr>';
       return;
     }
-    tbody.innerHTML=rows.map(a=>`
+    _accounts=rows;
+    tbody.innerHTML=rows.map((a,i)=>`
       <tr>
         <td class="mono">${esc(a.name)}</td>
         <td>${esc(a.location)}</td>
         <td>${publicBadge(a.publicAccess)}</td>
         <td>${a.httpsOnly==='true'?'<span class="badge badge-green">Yes</span>':'<span class="badge badge-red">No</span>'}</td>
-        <td><button class="btn-primary btn-sm" onclick="openAccount(${JSON.stringify(esc(a.name))})">Browse</button></td>
+        <td><button class="btn-primary btn-sm" onclick="openAccount(${i})">Browse</button></td>
       </tr>`).join('');
   }).catch(err=>{
     tbody.innerHTML=`<tr class="empty-row"><td colspan="5" style="color:var(--red)">${esc(err.message)}</td></tr>`;
@@ -471,8 +477,8 @@ function loadAccounts(){
 }
 
 // ── Containers ────────────────────────────────────────────────────────────────
-function openAccount(name){
-  // name was already esc'd before JSON.stringify in template — decode it
+function openAccount(idx){
+  const name = typeof idx==='number' ? _accounts[idx].name : idx;
   currentAccount=name;
   currentContainer=null;
   renderBreadcrumb();
@@ -480,22 +486,23 @@ function openAccount(name){
   document.getElementById('b-view-containers').style.display='block';
   document.getElementById('b-view-blobs').style.display='none';
   document.getElementById('containers-account').textContent=name;
-  loadContainers(name);
+  loadContainers();
 }
 
-function loadContainers(account){
+function loadContainers(){
   const tbody=document.getElementById('tbody-containers');
   tbody.innerHTML='<tr class="empty-row"><td colspan="3">Loading…</td></tr>';
-  apiPost('/api/containers',{accountName:account}).then(rows=>{
+  apiPost('/api/containers',{accountName:currentAccount}).then(rows=>{
+    _containers=rows;
     if(!rows.length){
       tbody.innerHTML='<tr class="empty-row"><td colspan="3">No containers found.</td></tr>';
       return;
     }
-    tbody.innerHTML=rows.map(c=>`
+    tbody.innerHTML=rows.map((c,i)=>`
       <tr>
         <td class="mono">${esc(c.name)}</td>
         <td>${publicBadge(c.publicAccess)}</td>
-        <td><button class="btn-primary btn-sm" onclick="openContainer(${JSON.stringify(esc(c.name))})">Browse</button></td>
+        <td><button class="btn-primary btn-sm" onclick="openContainer(${i})">Browse</button></td>
       </tr>`).join('');
   }).catch(err=>{
     tbody.innerHTML=`<tr class="empty-row"><td colspan="3" style="color:var(--red)">${esc(err.message)}</td></tr>`;
@@ -503,33 +510,35 @@ function loadContainers(account){
 }
 
 // ── Blobs ─────────────────────────────────────────────────────────────────────
-function openContainer(name){
+function openContainer(idx){
+  const name = typeof idx==='number' ? _containers[idx].name : idx;
   currentContainer=name;
   renderBreadcrumb();
   document.getElementById('b-view-accounts').style.display='none';
   document.getElementById('b-view-containers').style.display='none';
   document.getElementById('b-view-blobs').style.display='block';
   document.getElementById('blobs-container').textContent=name;
-  loadBlobs(currentAccount,name);
+  loadBlobs();
 }
 
-function loadBlobs(account,container){
+function loadBlobs(){
   const tbody=document.getElementById('tbody-blobs');
   tbody.innerHTML='<tr class="empty-row"><td colspan="5">Loading…</td></tr>';
-  apiPost('/api/blobs',{accountName:account,containerName:container}).then(rows=>{
+  apiPost('/api/blobs',{accountName:currentAccount,containerName:currentContainer}).then(rows=>{
+    _blobs=rows;
     if(!rows.length){
       tbody.innerHTML='<tr class="empty-row"><td colspan="5">Container is empty.</td></tr>';
       return;
     }
-    tbody.innerHTML=rows.map(b=>`
+    tbody.innerHTML=rows.map((b,i)=>`
       <tr>
         <td class="mono">${esc(b.name)}</td>
         <td>${fmtSize(b.size)}</td>
         <td><span class="badge badge-gray">${esc(b.contentType||'unknown')}</span></td>
         <td>${esc(b.lastModified)}</td>
         <td style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn-ghost btn-sm" onclick="viewBlob(${JSON.stringify(esc(b.name))})">👁 View</button>
-          <button class="btn-primary btn-sm" onclick="downloadBlob(${JSON.stringify(esc(b.name))})">⬇ Download</button>
+          <button class="btn-ghost btn-sm" onclick="viewBlob(${i})">👁 View</button>
+          <button class="btn-primary btn-sm" onclick="downloadBlobByIdx(${i})">⬇ Download</button>
         </td>
       </tr>`).join('');
   }).catch(err=>{
@@ -544,7 +553,7 @@ function renderBreadcrumb(){
   if(currentAccount){
     html+='<span class="crumb-sep">›</span>';
     if(currentContainer){
-      html+=`<span class="crumb" onclick="openAccount(${JSON.stringify(currentAccount)})">${esc(currentAccount)}</span>`;
+      html+=`<span class="crumb" onclick="goToAccount()">${esc(currentAccount)}</span>`;
     } else {
       html+=`<span class="crumb-current">${esc(currentAccount)}</span>`;
     }
@@ -556,14 +565,29 @@ function renderBreadcrumb(){
   bc.innerHTML=html;
 }
 
+// Go back to the containers view for the current account (breadcrumb click)
+function goToAccount(){
+  currentContainer=null;
+  renderBreadcrumb();
+  document.getElementById('b-view-accounts').style.display='none';
+  document.getElementById('b-view-containers').style.display='block';
+  document.getElementById('b-view-blobs').style.display='none';
+  document.getElementById('containers-account').textContent=currentAccount;
+  loadContainers();
+}
+
+function downloadBlobByIdx(i){ downloadBlob(_blobs[i].name); }
+
 // ── Blob Viewer ───────────────────────────────────────────────────────────────
-function viewBlob(name){
+function viewBlob(i){
+  const name = _blobs[i].name;
   const backdrop=document.getElementById('modal-backdrop');
   const titleEl=document.getElementById('modal-title');
   const ctEl=document.getElementById('modal-ct');
   const contentEl=document.getElementById('modal-content');
   const truncEl=document.getElementById('modal-truncated');
   const dlBtn=document.getElementById('modal-dl-btn');
+  if(!name) return; // guard against bad index
 
   titleEl.textContent=name;
   ctEl.textContent='';

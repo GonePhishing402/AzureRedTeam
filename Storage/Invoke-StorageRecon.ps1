@@ -146,7 +146,7 @@ function Invoke-ARMGetPaged {
             $allItems += $response.value
         }
 
-        $currentUri = $response.nextLink
+        $currentUri = if ($response.PSObject.Properties['nextLink']) { $response.nextLink } else { $null }
     }
 
     return $allItems
@@ -430,7 +430,7 @@ foreach ($account in $accounts) {
                     $allBlobs += $xmlResponse.EnumerationResults.Blobs.Blob
                 }
 
-                $marker = $xmlResponse.EnumerationResults.NextMarker
+                $marker = if ($xmlResponse.EnumerationResults.PSObject.Properties['NextMarker']) { $xmlResponse.EnumerationResults.NextMarker } else { $null }
             } while ($marker -ne "" -and $null -ne $marker)
 
             if ($allBlobs.Count -eq 0) {

@@ -216,7 +216,24 @@ func handleContainers(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	containers, err := ListContainersViaARM(s.ArmToken, s.SubID, req.AccountName)
+	// Look up the resource group for this account.
+	accounts, err := ListStorageAccounts(s.ArmToken, s.SubID, "")
+	if err != nil {
+		jsonError(w, "failed to list accounts to resolve resource group: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	rg := ""
+	for _, a := range accounts {
+		if strings.EqualFold(a.Name, req.AccountName) {
+			rg = ResourceGroupFromID(a.ID)
+			break
+		}
+	}
+	if rg == "" {
+		jsonError(w, "storage account not found in subscription", http.StatusNotFound)
+		return
+	}
+	containers, err := ListContainersViaARM(s.ArmToken, s.SubID, rg, req.AccountName)
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -276,9 +293,9 @@ func handleBlobs(w http.ResponseWriter, r *http.Request) {
 	for _, b := range blobs {
 		rows = append(rows, row{
 			Name:         b.Name,
-			Size:         b.Properties.ContentLength,
-			LastModified: b.Properties.LastModified,
-			ContentType:  b.Properties.ContentType,
+			Size:         b.ContentLength,
+			LastModified: b.LastModified,
+			ContentType:  b.ContentType,
 		})
 	}
 	if rows == nil {

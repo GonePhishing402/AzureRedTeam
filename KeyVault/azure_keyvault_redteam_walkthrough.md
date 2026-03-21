@@ -91,8 +91,4 @@ $(Get-AzKeyVaultSecret -VaultName "kvbluerangesecrets" -Name "AnotherSecret").Se
 
 ------------------------------------------------------------------------
 
-## References
 
--   AzureRedTeam/KeyVault/Get-AzureKeyVaultAccessTokenFromRefreshToken.ps1\
--   AzureRedTeam/KeyVault/SecretValue.ps1\
--   App id to Displayname - Microsoft Q&A

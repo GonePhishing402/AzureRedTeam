@@ -20,7 +20,6 @@ Instead:
 
     -   Azure Portal
     -   Teams
-    -   GraphSpy
     -   Custom app
 
 2.  That application has **Microsoft Graph API permissions configured**

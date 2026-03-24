@@ -18,8 +18,11 @@ Scripts for interacting with Microsoft Entra ID Administrative Units — scoped 
 
 Guides and scripts for authenticating to Azure and Microsoft services using access tokens, certificates, and service principals.
 
+- **[AuthenticatewithBackDoorSP.ps1](./Authentication/AuthenticatewithBackDoorSP.ps1)** — Authenticates to Microsoft Graph as a Service Principal by prompting for tenant ID, client ID, and client secret, then connecting via `Connect-MgGraph` using a `PSCredential` object. Useful for establishing persistent access using a backdoor service principal.
 - **[AuthenticationCheatSheet.md](./Authentication/AuthenticationCheatSheet.md)** — Quick-reference commands for connecting to Microsoft Graph with an access token, authenticating to Azure Resource Manager (ARM), connecting with both ARM and Key Vault tokens simultaneously, and extracting Key Vault certificates to PFX files.
 - **[Connect-AzureSPWithCertificate.ps1](./Authentication/Connect-AzureSPWithCertificate.ps1)** — PowerShell script to authenticate to Azure using a Service Principal with certificate-based authentication (`.pfx`). Useful for automation, CI/CD pipelines, and non-interactive login scenarios.
+- **[ServicePrincipal.md](./Authentication/ServicePrincipal.md)** — Cheat sheet for creating a backdoor service principal: registering a new application, instantiating a service principal from it, and generating a client secret — all via Microsoft Graph PowerShell (`New-MgApplication`, `New-MgServicePrincipal`, `Add-MgApplicationPassword`).
+- **[azure_app_vs_sp.md](./Authentication/azure_app_vs_sp.md)** — Reference explaining the distinction between Azure App Registrations (blueprints defining permissions and credentials) and Service Principals (per-tenant identity instances used to authenticate and receive RBAC roles). Covers the design rationale, an example creation workflow, and why RBAC is assigned to the Service Principal — not the Application.
 
 ---
 
@@ -42,7 +45,16 @@ Scripts for obtaining Key Vault access tokens and auditing Key Vault RBAC permis
 - **[Invoke-KeyVaultRecon.ps1](./KeyVault/Invoke-KeyVaultRecon.ps1)** — All-in-one Azure Key Vault reconnaissance script. Exchanges an OAuth refresh token for both ARM and Key Vault-scoped access tokens, authenticates an Az PowerShell context, enumerates all accessible Key Vaults in the subscription (or a targeted vault), checks RBAC permissions per vault via the ARM REST API, retrieves all secret values via the Key Vault REST API, and exports certificates as both PFX (with private key) and PEM files. All results are written to screen and saved to disk under a configurable output path.
 - **[SecretValue.ps1](./KeyVault/SecretValue.ps1)** — Retrieves a secret value from Azure Key Vault using the Key Vault REST API with a bearer token. Sends a GET request to the Key Vault secrets endpoint with a Key Vault-scoped JWT access token.
 - **[azure_keyvault_access_explanation.md](./KeyVault/azure_keyvault_access_explanation.md)** — Deep-dive reference explaining why Azure Key Vault separates management-plane (ARM) access from data-plane access. Covers the two API endpoints, required credentials for data-plane access, Key Vault RBAC data roles, and a red-team perspective on requesting resource-specific tokens from a captured refresh token.
+- **[azure_keyvault_redteam_walkthrough.md](./KeyVault/azure_keyvault_redteam_walkthrough.md)** — Step-by-step red team walkthrough for Azure Key Vault token theft: acquiring a Key Vault data-plane access token from a refresh token, authenticating with both ARM and Key Vault tokens, enumerating vaults and secrets, and extracting secret values via both the Key Vault REST API and native `Get-AzKeyVaultSecret` PowerShell.
 - **[azprowl/](./KeyVault/azprowl/)** — All-in-one Azure red team reconnaissance platform (pure Go, single binary). Provides a browser-based web UI and headless CLI for Key Vault recon, Azure Blob Storage enumeration, Microsoft Graph enumeration (users, devices, applications, service principals, groups, OneDrive, mail, Teams, SharePoint), FOCI token exchange, device code phishing, and persistent token storage. See the [azprowl README](./KeyVault/azprowl/README.md) for full usage.
+
+---
+
+### [PowerShell](./PowerShell/)
+
+General PowerShell reference material for operators building Azure and Microsoft 365 automation and attack workflows.
+
+- **[powershell_cheatsheet.md](./PowerShell/powershell_cheatsheet.md)** — General-purpose PowerShell cheat sheet covering cmdlet syntax (Verb-Noun), variables, the pipeline, object manipulation, filtering, loops, conditionals, file operations, module management (`Install-Module`, `Import-Module`), REST API calls with `Invoke-RestMethod`, JSON handling, and red team / cloud use cases including Azure and Microsoft Graph automation.
 
 ---
 
@@ -66,3 +78,5 @@ Scripts and references for acquiring, manipulating, and abusing Azure access tok
 
 - **[New-AccessToken.ps1](./Tokens/New-AccessToken.ps1)** — PowerShell function (sourced from Hunt & Hackett research) that generates a signed JWT client assertion using a client certificate and exchanges it for an Azure AD access token via the OAuth 2.0 client credentials flow. Supports configurable scope (defaults to Microsoft Graph).
 - **[NewAccessTokenCheatSheet.md](./Tokens/NewAccessTokenCheatSheet.md)** — Cheat sheet demonstrating how to use the `New-AccessToken` function to create Azure Management and Key Vault tokens for an application, connect to Azure with those tokens, and access Key Vault data-plane resources.
+- **[arm_vs_graph_token_breakdown.md](./Tokens/arm_vs_graph_token_breakdown.md)** — Deep-dive reference comparing ARM tokens (RBAC-based, `roles` claim, `management.azure.com` audience) vs. Microsoft Graph tokens (app permission-based, `scp` claim, `graph.microsoft.com` audience). Covers token structure differences, red team abuse paths for each token type, and a full attack chain from Graph token through ARM token to service-specific data access.
+- **[graph_permissions_breakdown.md](./Tokens/graph_permissions_breakdown.md)** — Reference explaining how users obtain Microsoft Graph permissions indirectly through App Registrations and OAuth consent flows, detailing the `scp` (scope) claim, the difference between Graph's app-centric model and ARM's RBAC model, and red team targeting of high-value permissions such as `Mail.Read`, `Files.Read.All`, and `Directory.Read.All`.

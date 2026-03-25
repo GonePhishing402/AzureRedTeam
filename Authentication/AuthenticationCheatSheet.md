@@ -8,7 +8,7 @@ Connect-MgGraph -AccessToken ($GraphAccessToken | ConvertTo-SecureString -AsPlai
 ## Connect to Azure Manager CLI with Access Token
 $ARM will hold you JWT
 ```powershell
-Connect-AzAccount -AccessToken $ARM -AccountId JaredGraff@domain.onmicrosoft.com -Tenant d6bd5a42-7c65-421c-ad23-a25a5d5fa57f
+Connect-AzAccount -AccessToken $ARM -AccountId username -Tenant [TENANTID]
 ```
 
 ## Connect to Azure Account with Primary Access Token and Key Vault Access Token

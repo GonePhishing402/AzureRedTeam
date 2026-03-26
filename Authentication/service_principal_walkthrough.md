@@ -44,7 +44,7 @@ Replace CLIENT_ID and SECRET with actual values:
 
 ```powershell
 $cred = New-Object PSCredential(
-    "CLIENT_ID",
+    "APP_ID",
     (ConvertTo-SecureString "SECRET" -AsPlainText -Force)
 )
 ```

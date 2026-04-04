@@ -1,5 +1,6 @@
 # Cheat Sheet to find different roles and paths
-## Find Entra Roles to SP - Help Desk Admin
+# Find Entra Roles to SP - Help Desk Admin
+## Enumerate Entra Roles
 ```powershell
 Get-MgRoleManagementDirectoryRoleAssignment -Filter "principalId eq 'cddece96-16c9-4c93-9c9d-97c96f98be1d'" | ForEach-Object {
     $roleDef = Get-MgRoleManagementDirectoryRoleDefinition -UnifiedRoleDefinitionId $_.RoleDefinitionId
@@ -14,7 +15,12 @@ Get-MgRoleManagementDirectoryRoleAssignment -Filter "principalId eq 'cddece96-16
 ```powershell
 Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId cddece96-16c9-4c93-9c9d-97c96f98be1d | fl
 ```
-### Resolve App Role Field
+## Resolve App Role Field
 ```powershell
 (Get-MgServicePrincipal -Filter "appId eq '00000003-0000-0000-c000-000000000000'").AppRoles | ? {$_.id -eq '246dd0d5-5bd0-4def-940b-0421030a5b68' } | fl
+```
+# Identify Temp Pass
+## Check for Misonciguration in Authentication Policy
+```powershell
+(Get-MgPolicyAuthenticationMethodPolicy).AuthenticationMethodConfigurations
 ```

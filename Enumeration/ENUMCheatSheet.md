@@ -1,4 +1,3 @@
-# Cheat Sheet to find different roles and paths
 # Find Entra Roles to SP - Help Desk Admin
 ## Enumerate Entra Roles
 ```powershell

@@ -35,3 +35,16 @@ Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId cddece96-16c9-4c93-9
 ```powershell
 New-MgUserAuthenticationTemporaryAccessPassMethod -UserId explorationsyncuserX@oilcorporation.onmicrosoft.com -BodyParameter $propertiesJSON | fl
 ```
+# Logic App Enumeration
+## View logic app
+```powershell
+(Get-AzLogicApp -Name WellPlanningLogicApp).Definition
+```
+## View Trigger URL of Logic App
+```powershell
+Get-AzLogicAppTriggerCallbackUrl -TriggerName manual -Name WellPlanningLogicApp -ResourceGroupName Drilling
+```
+## Trigger a Logic App - Use Trigger URL from Previous Command
+```powershell
+Invoke-RestMethod -Method POST -UseBasicParsing -Uri 'https://prod-70.eastus.logic.azure.com:443/workflows/b8190f07ab9647ff99fe54887bae2962/triggers/manual/paths/invoke?api-version=2018-07-01-preview&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ahq68505pOJPcuDLyB_SqhI1RGR_q9579HHUndempac'
+```

@@ -18,8 +18,20 @@ Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId cddece96-16c9-4c93-9
 ```powershell
 (Get-MgServicePrincipal -Filter "appId eq '00000003-0000-0000-c000-000000000000'").AppRoles | ? {$_.id -eq '246dd0d5-5bd0-4def-940b-0421030a5b68' } | fl
 ```
-# Identify Temp Pass
+# Identify Temporary Access Passwords (TAP)
 ## Check for Misonciguration in Authentication Policy
 ```powershell
 (Get-MgPolicyAuthenticationMethodPolicy).AuthenticationMethodConfigurations
+```
+## Get more info on the temp password
+```powershell
+(Get-MgPolicyAuthenticationMethodPolicyAuthenticationMethodConfiguration -AuthenticationMethodConfigurationId TemporaryAccessPass).AdditionalProperties
+```
+## Check which groups can use TAP
+```powershell
+(Get-MgPolicyAuthenticationMethodPolicyAuthenticationMethodConfiguration -AuthenticationMethodConfigurationId TemporaryAccessPass).AdditionalProperties.includeTargets
+```
+## Create new TAP for user - Need Authentication Administrator Permission and must Assign to User who can accept TAP
+```powershell
+New-MgUserAuthenticationTemporaryAccessPassMethod -UserId explorationsyncuserX@oilcorporation.onmicrosoft.com -BodyParameter $propertiesJSON | fl
 ```

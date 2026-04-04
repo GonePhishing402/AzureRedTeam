@@ -10,3 +10,7 @@ Get-MgRoleManagementDirectoryRoleAssignment -Filter "principalId eq 'cddece96-16
     }
 } | Select-Object RoleDisplayName, RoleId, DirectoryScopeId | fl
 ```
+## Find API permissions for App Role Assignments
+```powershell
+Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId cddece96-16c9-4c93-9c9d-97c96f98be1d | fl
+```

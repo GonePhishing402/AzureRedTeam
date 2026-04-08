@@ -8,8 +8,10 @@ C:\AzAD\Tools\InviShell\RunWithPathAsAdmin.bat
 ```
 ## Run PowerView to Enumerate On-Prem AD
 ```
-C:\AzAD\Tools\PowerView.ps1
+##Import PowerView
+. C:\AzAD\Tools\PowerView.ps1
 ```
 ```
+##Find Domain Controller
 Get-DomainComputer -DomainController reservoirone-dc.reservoirone.corp -Domain reservoirone.corp
 ```

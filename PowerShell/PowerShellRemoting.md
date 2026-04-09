@@ -12,3 +12,6 @@ $creds = New-Object System.Management.Automation.PSCredential('ASbiulag4854', $p
 ```powershell
 $ec2instance = New-PSSession -ComputerName 3.208.47.144 -Credential $creds
 ```
+```powershell
+Enter-PSSession $ec2instance
+```

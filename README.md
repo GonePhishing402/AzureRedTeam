@@ -24,6 +24,7 @@ Guides and scripts for authenticating to Azure and Microsoft services using acce
 - **[ServicePrincipal.md](./Authentication/ServicePrincipal.md)** — Cheat sheet for creating a backdoor service principal: registering a new application, instantiating a service principal from it, and generating a client secret — all via Microsoft Graph PowerShell (`New-MgApplication`, `New-MgServicePrincipal`, `Add-MgApplicationPassword`).
 - **[service_principal_walkthrough.md](./Authentication/service_principal_walkthrough.md)** — Step-by-step walkthrough covering the full service principal lifecycle: creating an app registration with `New-MgApplication`, instantiating a service principal, generating a client secret, building a `PSCredential` object, and authenticating to Azure via `Connect-AzAccount -ServicePrincipal`. Includes a consolidated full script for all steps.
 - **[azure_app_vs_sp.md](./Authentication/azure_app_vs_sp.md)** — Reference explaining the distinction between Azure App Registrations (blueprints defining permissions and credentials) and Service Principals (per-tenant identity instances used to authenticate and receive RBAC roles). Covers the design rationale, an example creation workflow, and why RBAC is assigned to the Service Principal — not the Application.
+- **[CertAuthentication.md](./Authentication/CertAuthentication.md)** — Cheat sheet for certificate-based authentication: decoding a Base64 certificate value, writing it to a `.pfx` file, and using it for service principal authentication.
 
 ---
 
@@ -34,6 +35,7 @@ Comprehensive cheat sheets for enumerating Azure resources and Microsoft 365 / E
 - **[AzureARMEnumeration.md](./Enumeration/AzureARMEnumeration.md)** — Azure Resource Manager (Az module) enumeration cheat sheet covering subscriptions, resource groups, virtual machines, storage accounts, blob storage, Key Vaults, networking, NSGs, SQL servers, RBAC role assignments, managed identities, and result export.
 - **[Get-AUUserMembers.ps1](./Enumeration/Get-AUUserMembers.ps1)** — Enumerates members of a Microsoft Entra ID Administrative Unit (AU) using Microsoft Graph PowerShell. Useful during red team operations to identify users within the scope of AU-delegated roles (e.g., Helpdesk Administrator, Password Administrator) to find privilege escalation or lateral movement paths.
 - **[MicrosoftGraphEnumeration.md](./Enumeration/MicrosoftGraphEnumeration.md)** — Microsoft Graph PowerShell enumeration cheat sheet covering users, groups, applications, service principals, devices, directory roles, conditional access policies, mail, calendars, Teams, SharePoint, OneDrive, and result export.
+- **[ENUMCheatSheet.md](./Enumeration/ENUMCheatSheet.md)** — Cheat sheet for enumerating Entra ID roles assigned to service principals, resolving App Role assignments, and identifying API permissions via Microsoft Graph PowerShell.
 
 ---
 
@@ -57,6 +59,7 @@ Scripts for obtaining Key Vault access tokens and auditing Key Vault RBAC permis
 General PowerShell reference material for operators building Azure and Microsoft 365 automation and attack workflows.
 
 - **[powershell_cheatsheet.md](./PowerShell/powershell_cheatsheet.md)** — General-purpose PowerShell cheat sheet covering cmdlet syntax (Verb-Noun), variables, the pipeline, object manipulation, filtering, loops, conditionals, file operations, module management (`Install-Module`, `Import-Module`), REST API calls with `Invoke-RestMethod`, JSON handling, and red team / cloud use cases including Azure and Microsoft Graph automation.
+- **[PowerShellRemoting.md](./PowerShell/PowerShellRemoting.md)** — Cheat sheet for PowerShell Remoting (WinRM): testing connectivity with `Test-WSMan`, creating remote sessions with credentials via `New-PSSession`, and entering interactive sessions with `Enter-PSSession`.
 
 ---
 
@@ -82,3 +85,28 @@ Scripts and references for acquiring, manipulating, and abusing Azure access tok
 - **[NewAccessTokenCheatSheet.md](./Tokens/NewAccessTokenCheatSheet.md)** — Cheat sheet demonstrating how to use the `New-AccessToken` function to create Azure Management and Key Vault tokens for an application, connect to Azure with those tokens, and access Key Vault data-plane resources.
 - **[arm_vs_graph_token_breakdown.md](./Tokens/arm_vs_graph_token_breakdown.md)** — Deep-dive reference comparing ARM tokens (RBAC-based, `roles` claim, `management.azure.com` audience) vs. Microsoft Graph tokens (app permission-based, `scp` claim, `graph.microsoft.com` audience). Covers token structure differences, red team abuse paths for each token type, and a full attack chain from Graph token through ARM token to service-specific data access.
 - **[graph_permissions_breakdown.md](./Tokens/graph_permissions_breakdown.md)** — Reference explaining how users obtain Microsoft Graph permissions indirectly through App Registrations and OAuth consent flows, detailing the `scp` (scope) claim, the difference between Graph's app-centric model and ARM's RBAC model, and red team targeting of high-value permissions such as `Mail.Read`, `Files.Read.All`, and `Directory.Read.All`.
+
+---
+
+### [ContainerApps](./ContainerApps/)
+
+Resources for enumerating and interacting with Azure Container Apps — a serverless container platform that can expose secrets, managed identity tokens, and command execution opportunities.
+
+- **[README.md](./ContainerApps/README.md)** — Container Apps reference covering `Microsoft.App` RBAC permissions for Container Apps and Jobs, built-in roles, `az containerapp exec` command execution examples, enumeration commands for listing apps, secrets, revisions, replicas, and logs, and links to official Microsoft documentation.
+
+---
+
+### [OnPrem](./OnPrem/)
+
+Cheat sheets for hybrid and on-premises Active Directory operations during Azure red team engagements.
+
+- **[OnPremCheatSheet.md](./OnPrem/OnPremCheatSheet.md)** — On-premises AD cheat sheet for hybrid scenarios: running as a cloud-synced hybrid user with `runas /netonly`, bypassing AV with InvisiShell, and enumerating on-prem AD with PowerView.
+
+---
+
+### [Tools](./Tools/)
+
+External tools and utilities useful for Azure red team operations.
+
+- **[AzSubEnum/](./Tools/AzSubEnum/)** — Resources for [AzSubEnum](https://github.com/yuyudhn/AzSubEnum), a Python-based Azure service subdomain enumeration tool that uses DNS resolution and permutation techniques to discover subdomains across App Services, Storage Accounts, Databases, Key Vaults, CDN, SharePoint, Azure Container Registry, and more.
+  - **[AzSubEnumCheatSheet.md](./Tools/AzSubEnum/AzSubEnumCheatSheet.md)** — Comprehensive cheat sheet covering installation, all CLI flags (including blob container enumeration), the full list of 19 Azure service domains checked, permutation logic, output formats, and red team usage tips.

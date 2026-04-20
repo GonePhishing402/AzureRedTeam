@@ -201,7 +201,99 @@ AppServiceAppLogs
 
 ---
 
-## 5. Microsoft Documentation References
+## 5. Microsoft Defender for Cloud — App Service Protection
+
+### Overview
+
+**Microsoft Defender for App Service** is a cloud-native workload protection plan within Microsoft Defender for Cloud that detects attacks targeting applications running on Azure App Service. It monitors:
+
+- The VM instance running your App Service and its management interface
+- Requests and responses sent to/from your App Service apps
+- Underlying sandboxes and VMs
+- App Service internal logs
+
+### Enable Defender for App Service
+
+#### Azure Portal
+
+1. Open **Microsoft Defender for Cloud** in the Azure Portal
+2. Navigate to **Environment Settings** > select your subscription
+3. Under **Defender plans**, enable **App Service**
+4. Select **Save**
+
+#### Azure CLI
+
+```bash
+az security pricing create --name AppServices --tier Standard
+```
+
+### Threat Detection by MITRE ATT&CK Tactic
+
+| MITRE Tactic | What Defender Detects |
+|---|---|
+| **Pre-attack** | Vulnerability scanner execution (Nessus, Qualys, etc.) probing for weaknesses |
+| **Initial Access** | Connections from known malicious IPs to FTP interface; exploitation of known vulnerabilities |
+| **Execution** | High-privilege command attempts; Linux commands on Windows App Service; fileless attacks; crypto mining tools |
+| **Persistence** | Web shell deployment and invocation |
+| **Command & Control** | Communication with suspicious or known malicious domains |
+
+### Cloud Native Detection
+
+Defender for App Service analyzes web request patterns at the application layer to detect:
+
+- **Remote code execution** — arbitrary command execution gaining control of the app environment
+- **Injection attempts** — manipulation of application logic to access sensitive data
+- **Compromise indicators** — signs the application is already compromised and being used to attack other systems
+
+### Workload Runtime Detection
+
+Defender also monitors container and process-level runtime activity:
+
+- **Web shell activity** — behaviors resembling web shell invocations in running containers
+- **Crypto mining** — suspicious downloads, CPU optimization patterns, and suspicious process execution
+- **Reconnaissance tools** — usage of known offensive tools
+
+### Dangling DNS Detection
+
+When an App Service website is decommissioned but its custom domain DNS record is not removed, Defender alerts on the **dangling DNS entry** — preventing subdomain takeover attacks where an attacker registers the orphaned subdomain to host malicious content.
+
+### Key Security Alerts Reference
+
+| Alert Name | Severity | Description |
+|---|---|---|
+| Attempt to run Linux commands on a Windows App Service | Medium | Detected attempt to run Linux commands on a Windows-based App Service |
+| Phishing content hosted on Azure Webapps | Medium | URL used in phishing attack found on the App Service website |
+| An attempt to run high privilege command detected | Medium | Suspicious process detected attempting to run elevated commands |
+| Web shell detected | High | Potential malicious web shell detected on the App Service |
+| Suspicious download using Certutil detected | Medium | Download of suspicious files by certutil.exe |
+| Known malicious IP connected to FTP interface | High | Connection from a known malicious IP to the App Service FTP endpoint |
+| Dangling DNS record detected | High | DNS entry points to a decommissioned App Service — subdomain takeover risk |
+| Vulnerability scanner detected | Medium | Known vulnerability scanner (e.g., Nessus, Qualys) targeting the App Service |
+| Digital currency mining detected | High | Crypto mining activity detected on the App Service host |
+| Suspicious PHP execution detected | Medium | Suspicious PHP execution indicating a possible web shell or malicious code |
+| Raw data download detected | Medium | App Service process performed an unusual raw data download |
+
+> **Full alerts list:** [Alerts for Azure App Service](https://learn.microsoft.com/azure/defender-for-cloud/alerts-azure-app-service)
+
+### Simulating an App Service Alert (Testing)
+
+To validate that Defender is working:
+
+1. Create or use an existing App Service website
+2. Wait 24 hours for it to register with Defender for Cloud (or use an existing site)
+3. Browse to: `https://<app-name>.azurewebsites.net/This_Will_Generate_ASC_Alert`
+4. An alert should appear within 2–4 hours
+
+### Responding to Alerts
+
+1. View alerts: **Defender for Cloud** > **Security alerts**
+2. Investigate the alert details, affected resource, and MITRE tactic mapping
+3. Follow the remediation steps provided
+4. Export alerts to SIEM, email, or Logic Apps via **Continuous Export**
+
+---
+
+## 6. Microsoft Documentation References
 
 - [Enable Diagnostic Logging for Apps in Azure App Service](https://learn.microsoft.com/azure/app-service/troubleshoot-diagnostic-logs)
 - [Monitor Azure App Service](https://learn.microsoft.com/azure/app-service/monitor-app-service)
@@ -212,3 +304,9 @@ AppServiceAppLogs
 - [Managed Identities for App Service](https://learn.microsoft.com/azure/app-service/overview-managed-identity)
 - [KQL Query Samples for AppServiceAppLogs](https://learn.microsoft.com/azure/azure-monitor/reference/queries/appserviceapplogs)
 - [Create Diagnostic Settings in Azure Monitor](https://learn.microsoft.com/azure/azure-monitor/essentials/diagnostic-settings)
+- [Defender for App Service Overview](https://learn.microsoft.com/azure/defender-for-cloud/defender-for-app-service-introduction)
+- [Alerts for Azure App Service (Full Reference)](https://learn.microsoft.com/azure/defender-for-cloud/alerts-azure-app-service)
+- [Enable Defender for App Service](https://learn.microsoft.com/azure/defender-for-cloud/tutorial-enable-app-service-plan)
+- [Manage and Respond to Security Alerts](https://learn.microsoft.com/azure/defender-for-cloud/manage-respond-alerts)
+- [Validate Alerts in Microsoft Defender for Cloud](https://learn.microsoft.com/azure/defender-for-cloud/alert-validation)
+- [Prevent Dangling DNS Entries and Subdomain Takeover](https://learn.microsoft.com/azure/security/fundamentals/subdomain-takeover)

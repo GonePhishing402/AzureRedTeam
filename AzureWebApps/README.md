@@ -17,3 +17,7 @@ curl -I "https://<app-name>.azurewebsites.net/"
 - `X-Powered-By` header leaks the runtime and version (e.g., `PHP/8.2.27`)
 
 ![Fingerprinting an Azure Web App](./images/fingerprint-azure-webapp.png)
+
+## Web App Remote Code Execution
+**Nested Commands to Obtain Remote Code Execution:**
+

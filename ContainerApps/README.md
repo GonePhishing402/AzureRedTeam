@@ -6,4 +6,4 @@ This folder is used to track resources, scripts, and cheatsheets related to Azur
 - Microsoft.App/containerApps/listsecrets/action
 - Microsoft.App/containerApps/authconfigs/read
 - Microsoft.App/containerApps/getauthtoken/action
-- If you see exec in the description, this could indicate you can get a remote shell on a container app.
+
